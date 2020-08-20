@@ -39,6 +39,8 @@ that new messages published to the topic will be processed by the function.
 The trigger condition is then added to the SNS topic to filter messages.
 Finally, the TopicARN is returned to the user.
 
+The Lambda function to retrieve the trigger info and invoke the Automate flow is
+in `trigger_prototype/lambda_function.py`
 
 Test Scripts
 ------------
