@@ -39,8 +39,6 @@ def add_permission(topic_arn, lambda_arn):
         Principal='sns.amazonaws.com',
         SourceArn=topic_arn,
     )
-    print('perms')
-    print(response)
     return response
 
 def create_subscription(client, topic_arn, lambda_arn, filter):
@@ -51,27 +49,20 @@ def create_subscription(client, topic_arn, lambda_arn, filter):
                                         ReturnSubscriptionArn=True)
 
         # now set the filter policy
-        print('sub')
-        print(subscription)
         response = client.set_subscription_attributes(
             SubscriptionArn=subscription['SubscriptionArn'],
             AttributeName='FilterPolicy',
             AttributeValue=json.dumps(filter)
         )
-        print('filter')
-        print(response)
+
     except Exception as e:
         print(e)
-    return subscription
+    return response
 
 def put_trigger(topic, info, dynamodb=None):
     if not dynamodb:
         dynamodb = boto3.resource('dynamodb')
 
-    print("here")
-
-    print(topic)
-    print(info)
     table = dynamodb.Table('Triggers')
     try:
         response = table.delete_item(
@@ -79,14 +70,12 @@ def put_trigger(topic, info, dynamodb=None):
                 'topic': topic
             }
         )
-        print(response)
         response = table.put_item(
            Item={
                 'topic': topic,
                 'info': info
             }
         )
-        print(response)
     except Exception as e:
         print(e)
 
@@ -100,8 +89,6 @@ def register_trigger():
     inputs = request.json
     payload = {'flow_input': inputs['flow_input'],
                'config': inputs['config']}
-    print(payload)
-
     ret_package = {'status': 'success'}
     try:
         client = boto3.client('sns')
@@ -111,7 +98,6 @@ def register_trigger():
         sub = create_subscription(client, sns_arn, LAMBDA_ARN, inputs['filter'])
 
         # now fire the metadata into the db under the topic_arn
-        print('putting trigger')
         put_trigger(sns_arn, payload)
         ret_package['topic_arn'] = topic['TopicArn']
     except Exception as e:
