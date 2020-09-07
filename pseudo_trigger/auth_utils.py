@@ -9,7 +9,6 @@ from typing import (
     List,
     Mapping,
     MutableSequence,
-    NamedTuple,
     Optional,
     Set,
 )
@@ -18,32 +17,21 @@ import cachetools
 from fastapi import HTTPException
 
 from pseudo_trigger.aiohttp_session import aio_session
-from pseudo_trigger.config import config
+from pseudo_trigger.config import get_config_val
+from pseudo_trigger.models import Token, TokenSet
 
 AUTH_DOMAIN = "https://auth.globus.org/"
 
 log = logging.getLogger(__name__)
 
 
-class Token(NamedTuple):
-    access_token: str
-    scope: str
-    resource_server: str
-    expires_in: Optional[int] = None
-    refresh_token: Optional[str] = None
-    token_type: Optional[str] = None
-    creation_time: Optional[int] = time.time()
-
-    def requires_refresh(self) -> bool:
-        now = time.time()
-        return now > self.expires_in + self.creation_time + 1800
-
-
 class AuthInfo(object):
     def __init__(self, bearer_token: str):
         self.access_token = bearer_token
+        self._usertoken: Optional[Token] = None
         self._token_resp = {}
-        self._dependent_tokens = None
+        self._dependent_tokens: Dict[str, Token] = None
+        self._tokenset: Optional[TokenSet] = None
 
     @property
     async def token_resp(self) -> Dict:
@@ -51,8 +39,9 @@ class AuthInfo(object):
             if self.access_token:
                 token_resp = await introspect_token(self.access_token)
                 self._token_resp = token_resp
-                for k, v in token_resp.items():
+                for k, v in self._token_resp.items():
                     setattr(self, k, v)
+
         return self._token_resp
 
     @property
@@ -60,12 +49,39 @@ class AuthInfo(object):
         _ = await self.token_resp
         t = Token(
             access_token=self.access_token,
+            refresh_token="",
             scope=self.scope,
             resource_server="",
-            expires_in=self.exp - time.time(),
+            expiration_time=self.exp,
             token_type=self.token_type,
         )
         return t
+
+    @property
+    async def dependent_tokens(self) -> List[Token]:
+        if self._dependent_tokens is None:
+            dep_tokens = await dependent_token_exchange(self.access_token)
+            self._dependent_tokens = []
+            for dep_token_result in dep_tokens:
+                dep_token_result[
+                    "expiration_time"
+                ] = time.time() + dep_token_result.pop("expires_in")
+                self._dependent_tokens.append(Token(**dep_token_result))
+            return self._dependent_tokens
+
+    @property
+    async def dependent_tokens_by_scope(self) -> Dict[str, Token]:
+        return {t.scope: t for t in await self.dependent_tokens}
+
+    @property
+    async def token_set(self) -> TokenSet:
+        if self._tokenset is None:
+            user_token = await self.user_token
+            dependent_tokens = await self.dependent_tokens_by_scope
+            self._tokenset = TokenSet(
+                user_token=user_token, dependent_tokens=dependent_tokens
+            )
+        return self._tokenset
 
     async def authorize(
         self, required_scope: str, required_principals: Set[str]
@@ -84,29 +100,14 @@ class AuthInfo(object):
             t = Token(**refresh_reply)
         return t
 
-    @property
-    async def dependent_tokens(self) -> List[Token]:
-        if self._dependent_tokens is None:
-            dep_tokens = await dependent_token_exchange(self.access_token)
-            self._dependent_tokens = [Token(**dt) for dt in dep_tokens]
-        # Refresh old tokens
-        self._dependent_tokens = [
-            await self.refresh_if_required(t) for t in self._dependent_tokens
-        ]
-        return self._dependent_tokens
-
-    @property
-    async def dependent_tokens_by_scope(self) -> Dict[str, Token]:
-        return {t.scope: t for t in await self.dependent_tokens}
-
 
 def _client_auth_header(
     client_id: Optional[str] = None, client_secret: Optional[str] = None
 ) -> Dict[str, str]:
     if client_id is None:
-        client_id = config.get("CLIENT_ID")
+        client_id = get_config_val("globus.auth.CLIENT_ID", None)
     if client_secret is None:
-        client_secret = config.get("CLIENT_SECRET")
+        client_secret = get_config_val("globus.auth.CLIENT_SECRET", None)
     auth_string = f"{client_id}:{client_secret}"
     return {
         "Authorization": "Basic "
@@ -275,7 +276,7 @@ async def create_scope(
         }
     }
 
-    client_id = config.get("CLIENT_ID")
+    client_id = get_config_val("globus.auth.CLIENT_ID")
     create_scope_path = f"/clients/{client_id}/scopes"
 
     create_scope_info = await _perform_auth_request(create_scope_path, "POST", params)

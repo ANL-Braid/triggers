@@ -1,0 +1,4 @@
+[globus.auth]
+
+INTROSPECT_URL= "https://auth.globus.org/v2/oauth2/token/introspect"
+CLIENT_ID = "5292be17-96f0-4ab6-957a-ecd516a1759e"

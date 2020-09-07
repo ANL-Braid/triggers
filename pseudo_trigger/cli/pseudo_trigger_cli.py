@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Mapping
 
 import requests
@@ -10,7 +11,7 @@ app = typer.Typer()
 trigger_app = typer.Typer(name="trigger")
 app.add_typer(trigger_app, name="trigger")
 
-BASE_URL = "http://localhost:5001/triggers"
+BASE_URL = os.environ.get("PSEUDO_TRIGGER_URL", "http://localhost:5001/triggers")
 
 CLI_NATIVE_CLIENT_ID = "1602fba0-9893-49cb-a2fe-aa064b452462"
 MANAGE_TRIGGERS_SCOPE = "https://auth.globus.org/scopes/5292be17-96f0-4ab6-957a-ecd516a1759e/manage_triggers"
@@ -56,8 +57,8 @@ def enable(scope: str = typer.Option(None), trigger_id: str = typer.Argument(...
         get_resp = requests.get(f"{BASE_URL}/{trigger_id}")
         if get_resp.status_code == 200:
             scope = get_resp.json().get("globus_auth_scope")
-    auth_header = get_authorization_header_for_scope(scope, CLI_NATIVE_CLIENT_ID)
 
+    auth_header = get_authorization_header_for_scope(scope, CLI_NATIVE_CLIENT_ID)
     resp = requests.post(f"{BASE_URL}/{trigger_id}/enable", headers=auth_header)
     echo_json(resp.json())
 
