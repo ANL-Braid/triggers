@@ -24,6 +24,7 @@ cachetools = "^4.1.1"
 aiohttp = "^3.6.2"
 colorama = "^0.4.3"
 starlette-context = "^0.2.3"
+toml = "^0.10.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.0.1"

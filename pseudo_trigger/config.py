@@ -54,6 +54,7 @@ def _load_config() -> Dict[str, Any]:
                 f"UNABLE TO LOAD CONFIG: {config_file_path} due to {str(e)}",
                 file=sys.stderr,
             )
+    _config.update({"OS_ENVIRONMENT": os.environ})
     return _config
 
 
@@ -65,6 +66,12 @@ def get_config_val(
     for part in parts:
         if part in config:
             config = config[part]
+            if isinstance(config, str) and config.startswith("environ::"):
+                config_parts = config.split("::")
+                if len(config_parts) < 2:
+                    config_parts.append(default)
+                config = os.environ.get(config_parts[1], config_parts[2])
+                break
         else:
             config = default
             break

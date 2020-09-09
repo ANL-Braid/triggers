@@ -3,7 +3,6 @@ import uuid
 from typing import Any, Mapping, Optional, Union
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-
 from pseudo_trigger.aiohttp_session import aio_session
 from pseudo_trigger.auth_utils import AuthInfo, get_scope_for_dependent_set
 from pseudo_trigger.log import setup_python_logging
@@ -45,6 +44,11 @@ async def globus_auth_dependency(
     return auth_info
 
 
+@app.get("/")
+async def healthcheck():
+    return {"status": "ok"}
+
+
 @app.post("/triggers", response_model=ResponseTrigger)
 async def create_trigger(
     trigger: Trigger, auth_info: AuthInfo = Depends(globus_auth_dependency)
@@ -74,7 +78,7 @@ async def create_trigger(
     vals = trigger.dict()
 
     internal_trigger = InternalTrigger(
-        id=trigger_id,
+        trigger_id=trigger_id,
         created_by=auth_info.sub,
         globus_auth_scope=scope_for_trigger,
         state=TriggerState.PENDING,
@@ -102,16 +106,14 @@ async def _lookup_trigger(
 
 @app.get("/triggers/{trigger_id}", response_model=ResponseTrigger)
 async def get_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     return await _lookup_trigger(trigger_id)
 
 
 @app.post("/triggers/{trigger_id}/enable", response_model=ResponseTrigger)
 async def enable_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
 
@@ -127,8 +129,7 @@ async def enable_trigger(
 
 @app.post("/triggers/{trigger_id}/disable", response_model=ResponseTrigger)
 async def disable_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
     set_trigger_state(trigger_id, TriggerState.PENDING)
@@ -148,9 +149,11 @@ async def send_event(trigger_id: str, body: Union[str, Mapping[str, Any]]) -> No
 
 @app.delete("/triggers/{trigger_id}", response_model=ResponseTrigger)
 async def delete_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
-    set_trigger_state(TriggerState.DELETING)
+    prev_state = set_trigger_state(trigger_id, TriggerState.DELETING)
+    # If this is enabled, then the polling task will clean it up. Else, we do it here
+    if prev_state is not TriggerState.ENABLED:
+        remove_trigger(trigger_id)
     return trigger

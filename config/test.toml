@@ -1,0 +1,7 @@
+[aws.dynamodb]
+create_table=false
+table_name="environ::PSEUDOTRIGGERTRIGGERS_NAME::test-pseudo_trigger_triggers"
+
+
+[log]
+debug = true

@@ -1,9 +1,9 @@
-# The manifest for the "globus-pseudo-trigger" service.
+# The manifest for the "pseudo-triggers-api" service.
 # Read the full specification for the "Load Balanced Web Service" type at:
 #  https://github.com/aws/copilot-cli/wiki/Manifests#load-balanced-web-svc
 
 # Your service name will be used in naming your resources like log groups, ECS services, etc.
-name: globus-pseudo-trigger
+name: pseudo-triggers-api
 # The "architecture" of the service you're running.
 type: Load Balanced Web Service
 

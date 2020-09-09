@@ -99,7 +99,7 @@ class Trigger(BaseModel):
 
 
 class ResponseTrigger(Trigger):
-    id: str
+    trigger_id: str
     created_by: str
     globus_auth_scope: HttpUrl
     state: TriggerState

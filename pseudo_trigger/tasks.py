@@ -5,17 +5,21 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Set
 
-from fastapi import HTTPException
 from simpleeval import InvalidExpression
 
+from fastapi import HTTPException
 from pseudo_trigger.aiohttp_session import aio_session
 from pseudo_trigger.expressions import eval_expressions
 from pseudo_trigger.log import setup_python_logging
-from pseudo_trigger.models import (ActionStatus, ActionStatusValue, Event,
-    InternalTrigger, ResponseTrigger, TriggerState)
-from pseudo_trigger.persistence import (lookup_trigger, remove_trigger,
-    update_trigger)
-
+from pseudo_trigger.models import (
+    ActionStatus,
+    ActionStatusValue,
+    Event,
+    InternalTrigger,
+    ResponseTrigger,
+    TriggerState,
+)
+from pseudo_trigger.persistence import lookup_trigger, remove_trigger, update_trigger
 
 log = logging.getLogger(__name__)
 setup_python_logging(log)
@@ -28,6 +32,7 @@ _LOCAL_FAILURE_ACTION_ID = "trigger_action_failure"
 
 _MAX_POLL_TIME = 30.0
 _MIN_POLL_TIME = 1.0
+
 
 @dataclass
 class TriggerStateRecord:
@@ -71,7 +76,11 @@ async def auth_header_for_scope(
     return req_headers
 
 
-async def check_action_result(action_resp, trigger: InternalTrigger, action_id: Optional[str] = _LOCAL_FAILURE_ACTION_ID) -> ActionStatus:
+async def check_action_result(
+    action_resp,
+    trigger: InternalTrigger,
+    action_id: Optional[str] = _LOCAL_FAILURE_ACTION_ID,
+) -> ActionStatus:
     print(f"DEBUG check_action_result (type(action_resp)):= {(type(action_resp))}")
     if 200 <= action_resp.status < 300:
         action_status_dict = await action_resp.json()
@@ -86,7 +95,7 @@ async def check_action_result(action_resp, trigger: InternalTrigger, action_id: 
     else:
         action_status_dict = {
             "action_id": action_id,
-            "status": ActionStatusValue.FAILED, 
+            "status": ActionStatusValue.FAILED,
             "details": await action_resp.text(),
         }
     action_status = ActionStatus(**action_status_dict)
@@ -108,8 +117,9 @@ async def process_event(
     except InvalidExpression:
         msg = f"Unable to evaluate expression {trigger.event_filter} on values {names}"
         log.info(msg)
-        return ActionStatus(action_id=_LOCAL_FAILURE_ACTION_ID, details=msg,
-                            creator="Unknown For Now")
+        return ActionStatus(
+            action_id=_LOCAL_FAILURE_ACTION_ID, details=msg, creator="Unknown For Now"
+        )
 
     log.debug(
         f"DEBUG filter eval (trigger.event_filter, filter_val, names):= {(trigger.event_filter, filter_val, names)}"
@@ -143,7 +153,7 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
         # action_tasks: Set[asyncio.Task] = set()
         # queue_poll_tasks: Set[asyncio.Task] = set()
         outstanding_action_ids: Set[str] = set()
-        trigger_state_rec = _get_trigger_state_record(trigger.id)
+        trigger_state_rec = _get_trigger_state_record(trigger.trigger_id)
         # We keep going as long as the trigger is enabled, or if we have actions to
         # monitor and the trigger hasn't been entirely deleted
         while trigger_state_rec.state is TriggerState.ENABLED or (
@@ -171,8 +181,7 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                     QUEUES_RECEIVE_SCOPE, trigger
                 )
                 msgs_response = await aio_session.get(
-                    queue_msgs_url + "?max_messages=10",
-                    headers=queues_auth_header,
+                    queue_msgs_url + "?max_messages=10", headers=queues_auth_header,
                 )
                 if 200 <= msgs_response.status < 300:
                     msgs_json = await msgs_response.json()
@@ -180,7 +189,7 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                     log.debug(f"DEBUG poller (msgs_json):= {(msgs_json)}")
                     for msg in msg_list:
                         event = Event.from_queue_msg(msg)
-                        trigger.last_event=event
+                        trigger.last_event = event
                         process_event_task = asyncio.create_task(
                             process_event(trigger, event)
                         )
@@ -214,7 +223,9 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
 
             if action_status_tasks or event_processing_tasks:
                 all_tasks = list(action_status_tasks.union(event_processing_tasks))
-                action_statuses: Iterable[Optional[ActionStatus]] = await asyncio.gather(*all_tasks)
+                action_statuses: Iterable[
+                    Optional[ActionStatus]
+                ] = await asyncio.gather(*all_tasks)
                 # Reset to just include the active responses
                 outstanding_action_ids = set()
                 for action_status in action_statuses:
@@ -226,9 +237,9 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                 poll_time = poll_time * 2.0
 
     except Exception as e:
-        log.error(f"Error on poller for {trigger.id}", exc_info=e)
+        log.error(f"Error on poller for {trigger.trigger_id}", exc_info=e)
     finally:
-        log.info(f"Poller for {trigger.id} exiting")
+        log.info(f"Poller for {trigger.trigger_id} exiting")
     # Set final state to match the internal tracking state
     trigger.state = trigger_state_rec.state
     update_trigger(trigger)
@@ -262,14 +273,16 @@ async def reaper(task_queue: asyncio.Queue):
                 log.info(f"Completed task {d}, return: {d_task}")
                 poll_tasks.remove(d)
                 if d_task.state is TriggerState.DELETING:
-                    remove_trigger(d_task.id)
+                    remove_trigger(d_task.trigger_id)
     except Exception as e:
         log.error(f"DEBUG reaper failed on  (str(e)):= {(str(e))}")
 
 
 async def start_poller(trigger: InternalTrigger) -> asyncio.Task:
-    log.info(f"Starting polling for trigger {trigger.id}")
-    poll_task = asyncio.create_task(poller(trigger), name=f"Poller for {trigger.id}")
+    log.info(f"Starting polling for trigger {trigger.trigger_id}")
+    poll_task = asyncio.create_task(
+        poller(trigger), name=f"Poller for {trigger.trigger_id}"
+    )
     await _task_queue.put(poll_task)
     return poll_task
 

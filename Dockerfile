@@ -13,4 +13,4 @@ RUN poetry install --no-dev
 
 EXPOSE 5001
 
-CMD ["/pseudo-trigger/.venv/bin/uvicorn", "pseudo_trigger.trigger_views:app", "--host", "0.0.0.0", "--port", "5001"]
+CMD ["/pseudo-trigger/.venv/bin/uvicorn", "pseudo_trigger.trigger_main:app", "--host", "0.0.0.0", "--port", "5001"]
