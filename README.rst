@@ -3,6 +3,21 @@ Pseudo Trigger Service
 
 Here's a little example of what a Trigger Service might do. It allows one to create a trigger which will pull events from a Globus Queue, filter the event content to see if it meets criteria for firing, and then will invoke an action (including a Flow) with a body which may be built from the content of the Event.
 
+Reasons for a Trigger Service:
+
+* Decouple event generation from Action execution
+
+  * Allow filtering of events so that not all events require Action invocation. Filter criteria independent of event generation
+
+  * Provide method for monitoring Actions based on events separate from where events are generated.
+
+* Lower latency for generating events rather than invoking actions yields improved performance in time constrained environments (such as instrument / data collection).
+
+* Provides a source for event fan-out: Within the trigger service, multiple triggers could be waiting on the same queue and filtering / invoking actions differently. Otherwise, a single queue can only have a single consumer.
+
+* Provide a method of correlating events from multiple sources.
+  
+
 Getting Started
 ---------------
 
