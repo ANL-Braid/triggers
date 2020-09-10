@@ -107,7 +107,7 @@ There's no immediate feedback that anything happened here, but the Trigger is mo
 
 We can check to see if this occurred by running:
 
-``pseudo-trigger display <trigger-id>``
+``pseudo-trigger trigger display <trigger-id>``
 
 The output should now be more verbose than the output of previous trigger operations. In particular, the fields ``last_action_status``, ``last_event`` and ``event_count`` should now have content letting us know what the Trigger has been up to most recently.
 
