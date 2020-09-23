@@ -28,11 +28,13 @@ def create(
     action_url: str = typer.Option(...),
     event_filter: str = typer.Option(...),
     event_template: str = typer.Option(...),
+    auth_scope: str = typer.Option(...),
 ):
     body = {
         "queue_id": queue_id,
         "action_url": action_url,
         "event_filter": event_filter,
+        "action_scope": auth_scope,
     }
     body["event_template"] = json.loads(event_template)
     auth_header = get_authorization_header_for_scope(
