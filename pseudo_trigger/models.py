@@ -22,7 +22,7 @@ class ActionStatus(BaseModel):
     status: ActionStatusValue
     creator_id: str
     action_id: str
-    start_time: datetime.datetime= Field(default_factory=datetime.datetime.now)
+    start_time: datetime.datetime = Field(default_factory=datetime.datetime.now)
     label: Optional[str] = None
     monitor_by: Optional[List[str]] = None
     manage_by: Optional[List[str]] = None
@@ -33,6 +33,7 @@ class ActionStatus(BaseModel):
 
     def is_complete(self):
         return self.status in (ActionStatusValue.SUCCEEDED, ActionStatusValue.FAILED)
+
 
 class Event(BaseModel):
     body: Dict[str, Any]
@@ -111,4 +112,3 @@ class ResponseTrigger(Trigger):
 class InternalTrigger(ResponseTrigger):
     token_set: TokenSet
     all_action_status: List[ActionStatus]
-

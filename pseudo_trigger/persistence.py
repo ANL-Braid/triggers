@@ -55,14 +55,18 @@ def create_table(
     return table
 
 
-def get_table(table_name: str,) -> DynamoTable:
+def get_table(
+    table_name: str,
+) -> DynamoTable:
     client = create_aws_resource("dynamodb")
     table: DynamoTable = client.Table(table_name)
     return table
 
 
 def lookup_trigger(trigger_id: str) -> Optional[InternalTrigger]:
-    table = get_table(get_config_val("aws.dynamodb.table_name"),)
+    table = get_table(
+        get_config_val("aws.dynamodb.table_name"),
+    )
     response = table.query(KeyConditionExpression=Key("trigger_id").eq(trigger_id))
     items = response.get("Items")
     if len(items) == 0:
@@ -91,7 +95,9 @@ def _to_dynamo_dict(model: BaseModel) -> Dict[str, Any]:
 
 
 def store_trigger(trigger: InternalTrigger) -> InternalTrigger:
-    table = get_table(get_config_val("aws.dynamodb.table_name"),)
+    table = get_table(
+        get_config_val("aws.dynamodb.table_name"),
+    )
     if trigger.trigger_id is None:
         trigger.trigger_id = str(uuid.uuid4())
     trigger_dict = _to_dynamo_dict(trigger)
@@ -100,7 +106,9 @@ def store_trigger(trigger: InternalTrigger) -> InternalTrigger:
 
 
 def update_trigger(trigger: InternalTrigger) -> InternalTrigger:
-    table = get_table(get_config_val("aws.dynamodb.table_name"),)
+    table = get_table(
+        get_config_val("aws.dynamodb.table_name"),
+    )
     if trigger.trigger_id is None:
         trigger.trigger_id = str(uuid.uuid4())
     trigger_dict = _to_dynamo_dict(trigger)
@@ -109,9 +117,14 @@ def update_trigger(trigger: InternalTrigger) -> InternalTrigger:
 
 
 def remove_trigger(trigger_id: str) -> InternalTrigger:
-    table = get_table(get_config_val("aws.dynamodb.table_name"),)
+    table = get_table(
+        get_config_val("aws.dynamodb.table_name"),
+    )
     del_resp = table.delete_item(
-        Key={"trigger_id": trigger_id,}, ReturnValues="ALL_OLD",
+        Key={
+            "trigger_id": trigger_id,
+        },
+        ReturnValues="ALL_OLD",
     )
     item = del_resp.get("Attributes")
     return InternalTrigger(**item)
@@ -121,7 +134,9 @@ def enum_triggers(**kwargs) -> List[InternalTrigger]:
     """
     This is probably really inefficient
     """
-    table = get_table(get_config_val("aws.dynamodb.table_name"),)
+    table = get_table(
+        get_config_val("aws.dynamodb.table_name"),
+    )
     filter_expression = None
     for attr_name, val in kwargs.items():
         this_filter_expression = Attr(attr_name).eq(val)

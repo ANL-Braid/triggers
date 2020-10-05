@@ -106,14 +106,16 @@ async def _lookup_trigger(
 
 @app.get("/triggers/{trigger_id}", response_model=ResponseTrigger)
 async def get_trigger(
-    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str,
+    auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     return await _lookup_trigger(trigger_id)
 
 
 @app.post("/triggers/{trigger_id}/enable", response_model=ResponseTrigger)
 async def enable_trigger(
-    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str,
+    auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
 
@@ -129,7 +131,8 @@ async def enable_trigger(
 
 @app.post("/triggers/{trigger_id}/disable", response_model=ResponseTrigger)
 async def disable_trigger(
-    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str,
+    auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
     set_trigger_state(trigger_id, TriggerState.PENDING)
@@ -149,7 +152,8 @@ async def send_event(trigger_id: str, body: Union[str, Mapping[str, Any]]) -> No
 
 @app.delete("/triggers/{trigger_id}", response_model=ResponseTrigger)
 async def delete_trigger(
-    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str,
+    auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
     prev_state = set_trigger_state(trigger_id, TriggerState.DELETING)

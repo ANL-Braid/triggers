@@ -225,6 +225,26 @@ async def my_scopes():
     return scopes.get("scopes")
 
 
+def _gen_scope_suffix(dependent_scope_strings: List[str]) -> str:
+    """
+    Really, any unique string is ok here
+    """
+    scope_suffix = "pseudo_trigger"
+    replacements = [("-", "_"), ("/", ""), (":", ""), (".", "")]
+    if len(dependent_scope_strings) > 0:
+        per_dependent_length = (
+            (55 - len(scope_suffix)) // len(dependent_scope_strings)
+        ) - 1
+        for dependent_scope in dependent_scope_strings:
+            scope_part = dependent_scope
+            for replacement in replacements:
+                scope_part = scope_part.replace(replacement[0], replacement[1])
+            if len(scope_part) > per_dependent_length - 1:
+                scope_part = scope_part[-per_dependent_length:]
+            scope_suffix = scope_suffix + f"_{scope_part}"
+    return scope_suffix
+
+
 async def get_scope_for_dependent_set(
     dependent_scope_strings: List[str],
     scope_name: Optional[str] = None,
@@ -241,17 +261,17 @@ async def get_scope_for_dependent_set(
     has_dependent_scopes = len(dependent_scope_strings) > 0
     if scope_name is None:
         if has_dependent_scopes:
-            scope_name = f"Pseudo Trigger using {dependent_scope_strings[0]}"
+            scope_name = (
+                f"Pseudo Trigger using scopes {','.join(dependent_scope_strings)}"
+            )
         else:
             scope_name = "For Pseudo Trigger "
     if scope_suffix is None:
-        if has_dependent_scopes:
-            replacements = [("-", "_"), ("/", ""), (":", ""), (".", "")]
-            scope_suffix = dependent_scope_strings[0].strip().lower()
-            for replacement in replacements:
-                scope_suffix = scope_suffix.replace(replacement[0], replacement[1])
-        else:
-            scope_suffix = "pseudo_trigger"
+        scope_suffix = _gen_scope_suffix(dependent_scope_strings)
+    log.info(
+        f"Creating scope w/ suffix {scope_suffix} for dependent scopes "
+        f"{dependent_scope_strings}"
+    )
     scope_string = await create_scope(scope_name, scope_suffix, scope_id_set)
 
     return scope_string

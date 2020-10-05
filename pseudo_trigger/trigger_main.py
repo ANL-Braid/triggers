@@ -19,4 +19,12 @@ async def startup():
         await start_poller(trigger)
 
 
+@trigger_app.on_event("shutdown")
+async def shutdown():
+    print("!!!!!!!!!!!!!!!!!!!!!")
+    print("! PSEUDO TRIGGER SHUTTING DOWN....")
+    print("!!!!!!!!!!!!!!!!!!!!!")
+    await init_polling()
+
+
 app = trigger_app

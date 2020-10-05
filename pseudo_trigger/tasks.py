@@ -3,11 +3,11 @@ import logging
 from asyncio.queues import QueueEmpty
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional, Set
-
-from simpleeval import InvalidExpression
+from typing import Any, Dict, Iterable, List, Optional, Set, Union
 
 from fastapi import HTTPException
+from simpleeval import InvalidExpression
+
 from pseudo_trigger.aiohttp_session import aio_session
 from pseudo_trigger.expressions import eval_expressions
 from pseudo_trigger.log import setup_python_logging
@@ -32,6 +32,13 @@ _LOCAL_FAILURE_ACTION_ID = "trigger_action_failure"
 
 _MAX_POLL_TIME = 30.0
 _MIN_POLL_TIME = 1.0
+
+
+# The state of the reaper task which can be considered a proxy for the state of all
+# asynch tasks. The first item in the list is the state of async polling and the second
+# element is the Task for the reaper. When the first element goes to False, all tasks,
+# including the reaper, should exit.
+reaper_state: List[Union[bool, asyncio.Task]] = [False, None]
 
 
 @dataclass
@@ -156,9 +163,13 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
         trigger_state_rec = _get_trigger_state_record(trigger.trigger_id)
         # We keep going as long as the trigger is enabled, or if we have actions to
         # monitor and the trigger hasn't been entirely deleted
-        while trigger_state_rec.state is TriggerState.ENABLED or (
-            trigger_state_rec.state is not TriggerState.DELETING
-            and len(outstanding_action_ids) > 0
+        while (
+            reaper_state[0] is True
+            and trigger_state_rec.state is TriggerState.ENABLED
+            or (
+                trigger_state_rec.state is not TriggerState.DELETING
+                and len(outstanding_action_ids) > 0
+            )
         ):
             queue_id = trigger.queue_id
             queue_msgs_url = (
@@ -181,7 +192,8 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                     QUEUES_RECEIVE_SCOPE, trigger
                 )
                 msgs_response = await aio_session.get(
-                    queue_msgs_url + "?max_messages=10", headers=queues_auth_header,
+                    queue_msgs_url + "?max_messages=10",
+                    headers=queues_auth_header,
                 )
                 if 200 <= msgs_response.status < 300:
                     msgs_json = await msgs_response.json()
@@ -254,7 +266,7 @@ async def reaper(task_queue: asyncio.Queue):
     try:
         poll_tasks = set()
 
-        while True:
+        while reaper_state[0] is True or len(poll_tasks) > 0:
             try:
                 poll_task = task_queue.get_nowait()
                 poll_tasks.add(poll_task)
@@ -266,7 +278,6 @@ async def reaper(task_queue: asyncio.Queue):
                 continue
 
             done, pending = await asyncio.wait(poll_tasks, timeout=10)
-            log.debug(f"DEBUG reaper (done,pending):= {(done,pending)}")
 
             for d in done:
                 d_task: InternalTrigger = await d
@@ -276,6 +287,7 @@ async def reaper(task_queue: asyncio.Queue):
                     remove_trigger(d_task.trigger_id)
     except Exception as e:
         log.error(f"DEBUG reaper failed on  (str(e)):= {(str(e))}")
+    log.info("REAPER EXITING...")
 
 
 async def start_poller(trigger: InternalTrigger) -> asyncio.Task:
@@ -288,4 +300,10 @@ async def start_poller(trigger: InternalTrigger) -> asyncio.Task:
 
 
 async def init_polling():
-    reaper_task = asyncio.create_task(reaper(_task_queue), name="Reaper")
+    reaper_state[0] = True
+    reaper_state[1] = asyncio.create_task(reaper(_task_queue), name="Reaper")
+
+
+async def shutdown_polling():
+    reaper_state[0] = False
+    reaper_result = await asyncio.wait_for(reaper_state[1])
