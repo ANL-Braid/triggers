@@ -4,6 +4,11 @@ version = "0.1.0"
 description = "Experiments with a trigger service"
 authors = ["Jim Pruyne <pruyne@globus.org>"]
 
+packages = [
+{include="pseudo_trigger"},
+{include="cdk_template"},
+]
+
 [tool.poetry.scripts]
 pseudo-trigger = "pseudo_trigger.cli:main"
 
@@ -34,7 +39,12 @@ python-language-server = {extras = ["rope", "pyflakes", "mccabe", "pycodestyle",
 pyls-black = "^0.4.6"
 pyls-mypy = "^0.1.8"
 isort = "^5.4.2"
+"aws-cdk.core" = "^1.66.0"
+"aws_cdk.aws_ec2" = "^1.66.0"
+"aws_cdk.aws_ecs" = "^1.66.0"
+"aws_cdk.aws_ecs_patterns" = "^1.66.0"
+pre-commit = "^2.7.1"
 
 [build-system]
-requires = ["poetry>=0.12"]
+requires = ["poetry_core>=1.0.0"]
 build-backend = "poetry.masonry.api"
