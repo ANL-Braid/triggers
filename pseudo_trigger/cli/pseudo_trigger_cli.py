@@ -4,6 +4,7 @@ from typing import Mapping
 
 import requests
 import typer
+from globus_automate_client import create_flows_client
 
 from .token_management import get_authorization_header_for_scope
 
@@ -28,15 +29,34 @@ def create(
     action_url: str = typer.Option(...),
     event_filter: str = typer.Option(...),
     event_template: str = typer.Option(...),
-    auth_scope: str = typer.Option(...),
+    action_scope: str = typer.Option(
+        "",
+        help="Optionally provide the scope for the action to be invoked. If not provided, it will be determined by introspecting the action-url",
+    ),
 ):
     body = {
         "queue_id": queue_id,
         "action_url": action_url,
         "event_filter": event_filter,
-        "action_scope": auth_scope,
     }
     body["event_template"] = json.loads(event_template)
+    if action_scope:
+        body["action_scope"] = action_scope
+    elif action_url.startswith("https://flows.globus.org"):
+        # If the action url is for the flows service, we will attempt to do a lookup in
+        # the flows service, but that requires authentication
+        fc = create_flows_client(CLI_NATIVE_CLIENT_ID)
+        _, flow_id = action_url.rsplit("/", 1)
+        print(f"Retrieving scope for Flow id: {flow_id}...")
+        flow_description = fc.get_flow(flow_id)
+        action_scope = flow_description.get("globus_auth_scope")
+        if action_scope:
+            typer.echo(f"Scope is {action_scope}")
+            body["action_scope"] = action_scope
+        else:
+            typer.echo(f"Failed to get scope")
+            raise typer.Exit(code=1)
+
     auth_header = get_authorization_header_for_scope(
         MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
     )

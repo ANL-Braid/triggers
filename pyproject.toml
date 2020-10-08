@@ -35,7 +35,7 @@ toml = "^0.10.1"
 pytest = "^6.0.1"
 importmagic = "^0.1.7"
 epc = "^0.0.5"
-python-language-server = {extras = ["rope", "pyflakes", "mccabe", "pycodestyle", "pydocstyle"], version = "^0.34.1"}
+# python-language-server = {extras = ["rope", "pyflakes", "mccabe", "pycodestyle", "pydocstyle"], version = "^0.35"}
 pyls-black = "^0.4.6"
 pyls-mypy = "^0.1.8"
 isort = "^5.4.2"
