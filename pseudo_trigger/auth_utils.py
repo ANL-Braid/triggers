@@ -11,6 +11,7 @@ from typing import (
     MutableSequence,
     Optional,
     Set,
+    Tuple,
 )
 
 import cachetools
@@ -137,11 +138,6 @@ async def _perform_auth_request(
             f"{response.status} with body {resp_text} for "
             f"input body: {body}"
         )
-        print(
-            f"Failed to {method} resource {url} due return code "
-            f"{response.status} with body {resp_text} for "
-            f"input body: {body}"
-        )
         raise HTTPException(
             status_code=500,
             detail=f"Failed to Communicate with Globus Auth: {resp_text}",
@@ -225,23 +221,42 @@ async def my_scopes():
     return scopes.get("scopes")
 
 
+def _gen_truncated_string_from_suffixes(
+    strings: List[str],
+    max_len: int,
+    sepstring: str = "_",
+    part_replacements: Iterable[Tuple[str, str]] = (),
+) -> str:
+    ret_string = ""
+    if len(strings) > 0:
+        per_str_len = max_len // len(strings) - len(sepstring) - 1
+        for string in strings:
+            for replacement in part_replacements:
+                string = string.replace(replacement[0], replacement[1])
+            if len(string) > per_str_len:
+                string = string[-per_str_len:]
+            ret_string = ret_string + f"{sepstring}{string}"
+    return ret_string
+
+
+def _gen_scope_name(dependent_scope_strings: List[str]) -> str:
+    scope_name = "Pseudo Trigger using scopes"
+    suffix_part = _gen_truncated_string_from_suffixes(
+        dependent_scope_strings, 180, sepstring=","
+    )
+    return scope_name + suffix_part
+
+
 def _gen_scope_suffix(dependent_scope_strings: List[str]) -> str:
     """
     Really, any unique string is ok here
     """
     scope_suffix = "pseudo_trigger"
     replacements = [("-", "_"), ("/", ""), (":", ""), (".", "")]
-    if len(dependent_scope_strings) > 0:
-        per_dependent_length = (
-            (55 - len(scope_suffix)) // len(dependent_scope_strings)
-        ) - 1
-        for dependent_scope in dependent_scope_strings:
-            scope_part = dependent_scope
-            for replacement in replacements:
-                scope_part = scope_part.replace(replacement[0], replacement[1])
-            if len(scope_part) > per_dependent_length - 1:
-                scope_part = scope_part[-per_dependent_length:]
-            scope_suffix = scope_suffix + f"_{scope_part}"
+    suffix_part = _gen_truncated_string_from_suffixes(
+        dependent_scope_strings, 50, sepstring="_", part_replacements=replacements
+    )
+    scope_suffix = "pseudo_trigger" + suffix_part
     return scope_suffix
 
 
@@ -261,11 +276,9 @@ async def get_scope_for_dependent_set(
     has_dependent_scopes = len(dependent_scope_strings) > 0
     if scope_name is None:
         if has_dependent_scopes:
-            scope_name = (
-                f"Pseudo Trigger using scopes {','.join(dependent_scope_strings)}"
-            )
+            scope_name = _gen_scope_name(dependent_scope_strings)
         else:
-            scope_name = "For Pseudo Trigger "
+            scope_name = "For Pseudo Trigger"
     if scope_suffix is None:
         scope_suffix = _gen_scope_suffix(dependent_scope_strings)
     log.info(

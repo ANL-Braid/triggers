@@ -16,7 +16,7 @@ Reasons for a Trigger Service:
 * Provides a source for event fan-out: Within the trigger service, multiple triggers could be waiting on the same queue and filtering / invoking actions differently. Otherwise, a single queue can only have a single consumer.
 
 * Provide a method of correlating events from multiple sources.
-  
+
 
 Getting Started
 ---------------
@@ -27,7 +27,7 @@ This should create a virtualenv (.venv) in the current directory.
 
 This will create the service, but it also will install a command line tool which will be installed into the virtual environment. It can be invoked via either ``poetry run pseudo-trigger`` or by invoking it within the virtual environment as in ``.venv/bin/pseudo-trigger`` (I prefer the latter).
 
-As we are in rapid development phase, there's no set DNS name for the service. Thus, you need to pass the URL for the trigger service into the CLI tool via the environment variable: ``PSEUDO_TRIGGER_URL``. 
+As we are in rapid development phase, there's no set DNS name for the service. Thus, you need to pass the URL for the trigger service into the CLI tool via the environment variable: ``PSEUDO_TRIGGER_URL``.
 
 At time of writing the full value for this should be:
 
@@ -61,7 +61,7 @@ There are four key pieces of information here:
 
 1. The URL of the Action to invoke in response to events/messages. This should be the base URL of an Action or of a Flow, and it must follow the Action API spec to publish its required scope via the introspection API call (all Globus operated Actions as well as all Flows do so).
 
-2. An Event Filter expression which will be evaluated against each incoming event to determine if the action should be invoked. This Event Filter must evaluate to a boolean value (python-like truthiness is not good enough (that's a general statement but it applies specifically here)). More on writing expressions on event content below. 
+2. An Event Filter expression which will be evaluated against each incoming event to determine if the action should be invoked. This Event Filter must evaluate to a boolean value (python-like truthiness is not good enough (that's a general statement but it applies specifically here)). More on writing expressions on event content below.
 
 3. A Template, in JSON format (sorry no reading from file support yet), of the body which will be passed to the Actin/Flow when invoking it. This follows a format very similar to the ``Parameters`` block of a Globus Flows Action state. A simple value within the JSON will be passed as is. If the property name ends with ``.=`` it will be evaluated as an expression (still getting to that point where we can tell you about expressions).
 
@@ -118,7 +118,7 @@ Some notes on the service:
 
 1. The Trigger service is built on FastAPI and it makes (extensive) use of the Python asyncio capability which is supported by FastAPI. This is intended to make the service both scaleable (asyncio is notable for being light on resource usage) and responsive (no single Trigger or Action should block others from making solid progress).
 
-2. When a Trigger is enabled, an asyncio task is created for monitoring the Queue associated with the trigger. This task will stay alive as long as the Trigger is in the ``ENABLED`` state or when the Trigger still has Actions running. The loop for this task will monitor both the Queue and any Actions which are still outstanding. It will also release actions when they are complete. 
+2. When a Trigger is enabled, an asyncio task is created for monitoring the Queue associated with the trigger. This task will stay alive as long as the Trigger is in the ``ENABLED`` state or when the Trigger still has Actions running. The loop for this task will monitor both the Queue and any Actions which are still outstanding. It will also release actions when they are complete.
 
 3. Only one Trigger can (reliably) listen on a Queue at a time (not enforced right now). If multiple Triggers have the same Queue id, they will compete for messages (presumably). It would be desirable to allow for multiple Triggers to listen to the same Queue and for each to receive each message. This would allow for effective fan out of messages from Queues.
 
