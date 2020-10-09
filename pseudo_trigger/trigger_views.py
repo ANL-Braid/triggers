@@ -3,13 +3,13 @@ import uuid
 from typing import Any, Mapping, Optional, Union
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+
 from pseudo_trigger.aiohttp_session import aio_session
 from pseudo_trigger.auth_utils import AuthInfo, get_scope_for_dependent_set
 from pseudo_trigger.log import setup_python_logging
 from pseudo_trigger.models import (
     InternalTrigger,
     ResponseTrigger,
-    TokenSet,
     Trigger,
     TriggerState,
 )
@@ -46,7 +46,7 @@ async def globus_auth_dependency(
 
 @app.get("/")
 async def healthcheck():
-    return {"status": "ok"}
+    return {"status": "ok2"}
 
 
 @app.post("/triggers", response_model=ResponseTrigger)
