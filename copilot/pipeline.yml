@@ -15,7 +15,7 @@ source:
   # has the following properties: repository, branch.
   properties:
     access_token_secret: github-token-pseudo-trigger-prototype-trigger-service
-    branch: master
+    branch: jim-main
     repository: https://github.com/globus-labs/prototype-trigger-service
 
 # The deployment section defines the order the pipeline will deploy
