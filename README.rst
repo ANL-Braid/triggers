@@ -31,11 +31,11 @@ As we are in rapid development phase, there's no set DNS name for the service. T
 
 At time of writing the full value for this should be:
 
-``PSEUDO_TRIGGER_URL="http://pseud-Publi-11PYV3L9WQ22M-382926136.us-east-1.elb.amazonaws.com/triggers"``
+``PSEUDO_TRIGGER_URL="https://triggers-api.test.triggers.automate.globuscs.info"``
 
 So, one can invoke the tool as:
 
-``PSEUDO_TRIGGER_URL="http://pseud-Publi-11PYV3L9WQ22M-382926136.us-east-1.elb.amazonaws.com/triggers" .venv/bin/pseudo-trigger``
+``PSEUDO_TRIGGER_URL="https://triggers-api.test.triggers.automate.globuscs.info" .venv/bin/pseudo-trigger``
 
 
 For the rest of this doc, we'll assume this setup for all invocations of the CLI tool, and simply write ``pseudo-trigger``.
@@ -51,7 +51,7 @@ where ``<my_auth_identity>`` is replaced with your Globus Auth identity which ca
 
 ``globus session show``
 
-Take note of the ``id`` field in the output for latter use. We'll refer to it as ``<queue_id>`` else where.
+Take note of the ``id`` field in the output for later use. We'll refer to it as ``<queue_id>`` else where.
 
 Now, we create a Trigger which will listen on this Queue via:
 
