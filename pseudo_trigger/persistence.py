@@ -7,12 +7,12 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional
 from boto3.dynamodb.conditions import Attr, Key
 from boto3.dynamodb.table import TableResource as DynamoTable
 from botocore.exceptions import ClientError, EndpointConnectionError
+from pydantic import BaseModel
 
 from pseudo_trigger.aws_helpers import create_aws_resource
 from pseudo_trigger.config import get_config_val
 from pseudo_trigger.log import setup_python_logging
 from pseudo_trigger.models import InternalTrigger
-from pydantic import BaseModel
 
 _triggers: Dict[str, InternalTrigger] = {}
 log = logging.getLogger(__name__)
@@ -161,7 +161,10 @@ def init_persistence() -> None:
 
     if do_create:
         table_name = local_dynamo_config.pop("table_name", None)
-        table_name = os.environ.get("PSEUDOTRIGGERTRIGGERS_NAME", table_name)
+        # As set by copilot
+        table_name = os.environ.get("TRIGGERTRIGGERS_NAME", table_name)
+        # As set by (current) Cloudformation
+        table_name = os.environ.get("TRIGGERS_TABLE_NAME", table_name)
 
         if table_name is None:
             print("CANNOT CREATE DYNAMO TABLE, NO table_name configured")

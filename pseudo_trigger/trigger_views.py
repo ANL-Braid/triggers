@@ -44,9 +44,10 @@ async def globus_auth_dependency(
     return auth_info
 
 
+@app.get("/status")
 @app.get("/")
 async def healthcheck():
-    return {"status": "ok2"}
+    return {"status": "ok"}
 
 
 @app.post("/triggers", response_model=ResponseTrigger)

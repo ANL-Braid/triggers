@@ -6,8 +6,9 @@ WORKDIR /pseudo-trigger
 
 COPY ./ ./
 
-RUN apt-get update -y && \
-    pip install poetry
+RUN apt-get update -y
+
+RUN pip install poetry==1.1
 
 RUN poetry install --no-dev
 
