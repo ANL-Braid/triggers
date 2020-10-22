@@ -31,11 +31,11 @@ As we are in rapid development phase, there's no set DNS name for the service. T
 
 At time of writing the full value for this should be:
 
-``PSEUDO_TRIGGER_URL="https://triggers-api.test.triggers.automate.globuscs.info"``
+``PSEUDO_TRIGGER_URL="https://triggers-api.test.triggers.automate.globuscs.info/triggers"``
 
 So, one can invoke the tool as:
 
-``PSEUDO_TRIGGER_URL="https://triggers-api.test.triggers.automate.globuscs.info" .venv/bin/pseudo-trigger``
+``PSEUDO_TRIGGER_URL="https://triggers-api.test.triggers.automate.globuscs.info/triggers" .venv/bin/pseudo-trigger``
 
 
 For the rest of this doc, we'll assume this setup for all invocations of the CLI tool, and simply write ``pseudo-trigger``.

@@ -5,8 +5,7 @@ description = "Experiments with a trigger service"
 authors = ["Jim Pruyne <pruyne@globus.org>"]
 
 packages = [
-{include="pseudo_trigger"},
-{include="cdk_template"},
+{include="pseudo_trigger"}
 ]
 
 [tool.poetry.scripts]
@@ -35,14 +34,10 @@ globus-action-provider-tools = "^0.10.3"
 pytest = "^6.0.1"
 importmagic = "^0.1.7"
 epc = "^0.0.5"
-# python-language-server = {extras = ["rope", "pyflakes", "mccabe", "pycodestyle", "pydocstyle"], version = "^0.35"}
+python-language-server = {extras = ["rope", "pyflakes", "mccabe", "pycodestyle", "pydocstyle"], version = "^0"}
 pyls-black = "^0.4.6"
 pyls-mypy = "^0.1.8"
 isort = "^5.4.2"
-# "aws-cdk.core" = "^1.66.0"
-# "aws_cdk.aws_ec2" = "^1.66.0"
-# "aws_cdk.aws_ecs" = "^1.66.0"
-# "aws_cdk.aws_ecs_patterns" = "^1.66.0"
 pre-commit = "^2.7.1"
 flake8 = "^3.8.4"
 

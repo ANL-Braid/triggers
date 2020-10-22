@@ -71,7 +71,6 @@ def get_config_val(
         if part in config:
             config = config[part]
             if isinstance(config, str) and config.startswith("environ::"):
-                print(f"FULL ENVIRONMENT: {os.environ}")
                 config_parts = config.split("::")
                 if len(config_parts) < 2:
                     config_parts.append(default)

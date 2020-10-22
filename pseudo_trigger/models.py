@@ -4,7 +4,7 @@ import datetime
 import json
 import time
 import uuid
-from enum import Enum, auto, unique
+from enum import Enum, unique
 from json import JSONDecodeError
 from typing import Any, Dict, List, Mapping, Optional
 
