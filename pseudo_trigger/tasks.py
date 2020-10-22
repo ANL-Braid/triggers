@@ -183,7 +183,7 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                 poll_time = _MIN_POLL_TIME
             log.debug(f"Polling Wait trigger_id={trigger_id}, poll_time={poll_time}")
             await asyncio.sleep(poll_time)
-            log.debug("Starting Poll trigger_id={trigger_id}")
+            log.debug(f"Starting Poll trigger_id={trigger_id}")
 
             event_processing_tasks: Set[asyncio.Task] = set()
             action_status_tasks: Set[asyncio.Task] = set()
