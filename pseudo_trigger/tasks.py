@@ -88,7 +88,7 @@ async def check_action_result(
     trigger: InternalTrigger,
     action_id: Optional[str] = _LOCAL_FAILURE_ACTION_ID,
 ) -> ActionStatus:
-    print(f"DEBUG check_action_result (type(action_resp)):= {(type(action_resp))}")
+    log.info("Action Result for trigger_id={trigger.trigger_id}: {action_resp}")
     if 200 <= action_resp.status < 300:
         action_status_dict = await action_resp.json()
         if action_status_dict.get("status") in {"SUCCEEDED", "FAILED"}:
@@ -113,9 +113,9 @@ async def check_action_result(
 async def process_event(
     trigger: InternalTrigger, event: Event
 ) -> Optional[ActionStatus]:
-    print(f"DEBUG process_event (event):= {(event)}")
     trigger.event_count += 1
 
+    log.info(f"Processing message trigger_id={trigger.trigger_id}, event={event}")
     try:
         names = event.dict()
         names["event_count"] = trigger.event_count
@@ -129,13 +129,14 @@ async def process_event(
         )
 
     log.debug(
-        f"DEBUG filter eval (trigger.event_filter, filter_val, names):= {(trigger.event_filter, filter_val, names)}"
+        f"Filter eval trigger_id={trigger.trigger_id} (trigger.event_filter, filter_val, names):= {(trigger.event_filter, filter_val, names)}"
     )
     ret_status = None
     if filter_val is True:
-        log.debug("Filter TRUE")
         action_body = eval_expressions(trigger.event_template, names)
-        log.debug(f"DEBUG body eval (action_body):= {(action_body)}")
+        log.debug(
+            f"Body eval trigger_id={trigger.trigger_id} (action_body):= {(action_body)}"
+        )
         req_body = {"request_id": event.event_id, "body": action_body}
 
         auth_header = await auth_header_for_scope(trigger.action_scope, trigger)
@@ -160,7 +161,8 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
         # action_tasks: Set[asyncio.Task] = set()
         # queue_poll_tasks: Set[asyncio.Task] = set()
         outstanding_action_ids: Set[str] = set()
-        trigger_state_rec = _get_trigger_state_record(trigger.trigger_id)
+        trigger_id = trigger.trigger_id
+        trigger_state_rec = _get_trigger_state_record(trigger_id)
         # We keep going as long as the trigger is enabled, or if we have actions to
         # monitor and the trigger hasn't been entirely deleted
         while (
@@ -179,9 +181,9 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                 poll_time = _MAX_POLL_TIME
             if poll_time < _MIN_POLL_TIME:
                 poll_time = _MIN_POLL_TIME
-            log.debug("POLLING WAIT...")
+            log.debug(f"Polling Wait trigger_id={trigger_id}, poll_time={poll_time}")
             await asyncio.sleep(poll_time)
-            log.debug("POLLING WAIT END...")
+            log.debug("Starting Poll trigger_id={trigger_id}")
 
             event_processing_tasks: Set[asyncio.Task] = set()
             action_status_tasks: Set[asyncio.Task] = set()
@@ -198,7 +200,9 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                 if 200 <= msgs_response.status < 300:
                     msgs_json = await msgs_response.json()
                     msg_list = msgs_json.get("data", [])
-                    log.debug(f"DEBUG poller (msgs_json):= {(msgs_json)}")
+                    log.debug(
+                        f"Poller trigger_id={trigger_id} received {len(msg_list)} messages"
+                    )
                     for msg in msg_list:
                         event = Event.from_queue_msg(msg)
                         trigger.last_event = event
@@ -223,7 +227,7 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                 else:
                     text = await msgs_response.text()
                     log.debug(
-                        f"Got unexpected response from queue {queue_id}: "
+                        f"trigger_id={trigger_id} Got unexpected response from queue {queue_id}: "
                         f"{msgs_response} containing {text}"
                     )
 
