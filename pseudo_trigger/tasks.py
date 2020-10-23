@@ -201,7 +201,7 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                     msgs_json = await msgs_response.json()
                     msg_list = msgs_json.get("data", [])
                     log.debug(
-                        f"Poller trigger_id={trigger_id} received {len(msg_list)} messages"
+                        f"Poller trigger_id={trigger_id}, queue_id={queue_id} received {len(msg_list)} messages"
                     )
                     for msg in msg_list:
                         event = Event.from_queue_msg(msg)

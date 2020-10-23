@@ -111,6 +111,9 @@ test_result.xml
 *.swp
 *.swo
 
+# Protected config stuff
+config/*-local.toml
+
 # Working stuff
 *.foo
 dev-scratch/
