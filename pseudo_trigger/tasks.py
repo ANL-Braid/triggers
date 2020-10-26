@@ -253,6 +253,10 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                         f"trigger_id={trigger_id} Got unexpected response from queue {queue_id}: "
                         f"{msgs_response} containing {text}"
                     )
+                    trigger.last_action_status = _error_action_status(
+                        f"Error reading from queue: {text}"
+                    )
+                    update_trigger(trigger)
 
             for action_id in outstanding_action_ids:
                 action_status_task = asyncio.create_task(
@@ -314,7 +318,7 @@ async def reaper(task_queue: asyncio.Queue):
                 if d_task.state is TriggerState.DELETING:
                     remove_trigger(d_task.trigger_id)
     except Exception as e:
-        log.error(f"DEBUG reaper failed on  (str(e)):= {(str(e))}")
+        log.error(f"Reaper failed on {(str(e))}")
     log.info("REAPER EXITING...")
 
 
