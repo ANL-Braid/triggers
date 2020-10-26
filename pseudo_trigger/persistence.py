@@ -88,6 +88,12 @@ def lookup_trigger(trigger_id: str) -> Optional[InternalTrigger]:
 """
 
 
+def scan_triggers() -> List[InternalTrigger]:
+    table = get_table(
+        get_config_val("aws.dynamodb.table_name"),
+    )
+
+
 def _to_dynamo_dict(model: BaseModel) -> Dict[str, Any]:
     json_str = model.json()
     model_dict = json.loads(json_str)

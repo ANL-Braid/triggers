@@ -48,8 +48,8 @@ class Event(BaseModel):
         message_body = queue_msg.get("message_body", "")
         try:
             event_body = json.loads(message_body)
-        except JSONDecodeError:
-            event_body = {"message": message_body}
+        except JSONDecodeError as jsde:
+            event_body = {"message": message_body, "json_parse_status": str(jsde)}
         event_id = queue_msg.get("message_id", "")
         e = Event(
             body=event_body,

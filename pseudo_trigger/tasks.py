@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Set, Union
 
 from fastapi import HTTPException
-from simpleeval import InvalidExpression
 
 from pseudo_trigger.aiohttp_session import aio_session
 from pseudo_trigger.expressions import eval_expressions
@@ -19,7 +18,7 @@ from pseudo_trigger.models import (
     ResponseTrigger,
     TriggerState,
 )
-from pseudo_trigger.persistence import lookup_trigger, remove_trigger, update_trigger
+from pseudo_trigger.persistence import remove_trigger, update_trigger
 
 log = logging.getLogger(__name__)
 setup_python_logging(log)
@@ -242,7 +241,7 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                         )
                         msg_delete_text = await msg_delete.text()
                         log.debug(
-                            f"DEBUG message delete (msg_delete_json):= {(msg_delete_text)}"
+                            f"message delete (msg_delete_json):= {(msg_delete_text)}"
                         )
 
                         if 200 <= msg_delete.status < 300:
