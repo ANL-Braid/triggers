@@ -121,19 +121,37 @@ async def process_event(
         names["event_count"] = trigger.event_count
         filter_val_dict = eval_expressions({"filter.=": trigger.event_filter}, names)
         filter_val = filter_val_dict.get("filter")
-    except InvalidExpression:
-        msg = f"Unable to evaluate expression {trigger.event_filter} on values {names}"
+    except ValueError as ve:
+        msg = (
+            f"On trigger_id={trigger.trigger_id}: Unable to evaluate expression "
+            f"{trigger.event_filter} on values {names} due to {str(ve)}"
+        )
         log.info(msg)
         return ActionStatus(
             action_id=_LOCAL_FAILURE_ACTION_ID, details=msg, creator="Unknown For Now"
         )
 
     log.debug(
-        f"Filter eval trigger_id={trigger.trigger_id} (trigger.event_filter, filter_val, names):= {(trigger.event_filter, filter_val, names)}"
+        f"Filter eval trigger_id={trigger.trigger_id} "
+        f"(trigger.event_filter, filter_val, names):= "
+        f"{(trigger.event_filter, filter_val, names)}"
     )
     ret_status = None
     if filter_val is True:
-        action_body = eval_expressions(trigger.event_template, names)
+        try:
+            action_body = eval_expressions(trigger.event_template, names)
+        except ValueError as ve:
+            msg = (
+                f"On trigger_id={trigger.trigger_id}: Unable to evaluate expression "
+                f"{trigger.event_template} on values {names} due to {str(ve)}"
+            )
+            log.info(msg)
+            return ActionStatus(
+                action_id=_LOCAL_FAILURE_ACTION_ID,
+                details=msg,
+                creator="Unknown For Now",
+            )
+
         log.debug(
             f"Body eval trigger_id={trigger.trigger_id} (action_body):= {(action_body)}"
         )
