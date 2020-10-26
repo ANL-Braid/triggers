@@ -75,6 +75,17 @@ def set_trigger_state(trigger_id: str, state: TriggerState) -> TriggerState:
     return r
 
 
+def _error_action_status(
+    msg: str, action_id: str = _LOCAL_FAILURE_ACTION_ID
+) -> ActionStatus:
+    return ActionStatus(
+        action_id=action_id,
+        details=msg,
+        creator="Unknown For Now",
+        status=ActionStatusValue.FAILED,
+    )
+
+
 async def auth_header_for_scope(
     scope: str, trigger: InterruptedError
 ) -> Dict[str, Any]:
@@ -127,9 +138,7 @@ async def process_event(
             f"{trigger.event_filter} on values {names} due to {str(ve)}"
         )
         log.info(msg)
-        return ActionStatus(
-            action_id=_LOCAL_FAILURE_ACTION_ID, details=msg, creator="Unknown For Now"
-        )
+        return _error_action_status(msg)
 
     log.debug(
         f"Filter eval trigger_id={trigger.trigger_id} "
@@ -146,11 +155,7 @@ async def process_event(
                 f"{trigger.event_template} on values {names} due to {str(ve)}"
             )
             log.info(msg)
-            return ActionStatus(
-                action_id=_LOCAL_FAILURE_ACTION_ID,
-                details=msg,
-                creator="Unknown For Now",
-            )
+            return _error_action_status(msg)
 
         log.debug(
             f"Body eval trigger_id={trigger.trigger_id} (action_body):= {(action_body)}"
@@ -271,7 +276,8 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                 poll_time = poll_time * 2.0
 
     except Exception as e:
-        log.error(f"Error on poller for {trigger.trigger_id}", exc_info=e)
+        log.error(f"Error on poller for {trigger.trigger_id}: {str(e)}", exc_info=True)
+        trigger_state_rec.state = TriggerState.PENDING
     finally:
         log.info(f"Poller for {trigger.trigger_id} exiting")
     # Set final state to match the internal tracking state
