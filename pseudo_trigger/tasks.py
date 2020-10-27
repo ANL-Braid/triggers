@@ -79,7 +79,7 @@ def _error_action_status(
 ) -> ActionStatus:
     return ActionStatus(
         action_id=action_id,
-        details=msg,
+        details={"error": msg, "trigger_processing_error": True},
         creator_id="Unknown For Now",
         status=ActionStatusValue.FAILED,
     )
