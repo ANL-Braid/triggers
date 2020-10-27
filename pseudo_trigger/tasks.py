@@ -98,7 +98,7 @@ async def check_action_result(
     trigger: InternalTrigger,
     action_id: Optional[str] = _LOCAL_FAILURE_ACTION_ID,
 ) -> ActionStatus:
-    log.info("Action Result for trigger_id={trigger.trigger_id}: {action_resp}")
+    log.info(f"Action Result for trigger_id={trigger.trigger_id}: {action_resp}")
     if 200 <= action_resp.status < 300:
         action_status_dict = await action_resp.json()
         if action_status_dict.get("status") in {"SUCCEEDED", "FAILED"}:
@@ -109,14 +109,11 @@ async def check_action_result(
             )
             if 200 <= release_resp.status < 300:
                 action_status_dict = await release_resp.json()
+        action_status = ActionStatus(**action_status_dict)
     else:
-        action_status_dict = {
-            "action_id": action_id,
-            "status": ActionStatusValue.FAILED,
-            "details": await action_resp.text(),
-        }
-    action_status = ActionStatus(**action_status_dict)
-    trigger.last_action_status = action_status
+        action_status = _error_action_status(
+            await action_resp.text(), action_id=action_id
+        )
     return action_status
 
 
