@@ -105,6 +105,8 @@ class ResponseTrigger(Trigger):
     globus_auth_scope: HttpUrl
     state: TriggerState
     last_action_status: Optional[ActionStatus] = None
+    last_action_statuses: Optional[List[ActionStatus]] = None
+    last_error_action_status: Optional[ActionStatus] = None
     event_count: int = 0
     last_event: Optional[Event] = None
 

@@ -271,8 +271,20 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                 # Reset to just include the active responses
                 outstanding_action_ids = set()
                 for action_status in action_statuses:
-                    if action_status is not None and not action_status.is_complete:
-                        outstanding_action_ids.add(action_status.action_id)
+                    if action_status is not None:
+                        if not action_status.is_complete:
+                            outstanding_action_ids.add(action_status.action_id)
+                        trigger.last_action_status = action_status
+                        if trigger.last_action_statuses is None:
+                            trigger.last_action_statuses = []
+                        if len(trigger.last_action_statuses) > 10:
+                            trigger.last_action_statuses = trigger.last_action_statuses[
+                                :-1
+                            ]
+                        trigger.last_action_statuses.append(action_status)
+                        if action_status.status is ActionStatusValue.FAILED:
+                            trigger.last_error_action_status = action_status
+
                 update_trigger(trigger)
                 poll_time = poll_time / 2.0
             else:
