@@ -1,6 +1,6 @@
 [aws.dynamodb]
 create_table=false
-table_name="environ::TRIGGERTRIGGERS_NAME::test-pseudo_trigger_triggers"
+table_name="environ::TRIGGERTRIGGERS_NAME::test-trigger_triggers"
 
 
 [log]

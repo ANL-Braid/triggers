@@ -80,7 +80,7 @@ def _error_action_status(
     return ActionStatus(
         action_id=action_id,
         details=msg,
-        creator="Unknown For Now",
+        creator_id="Unknown For Now",
         status=ActionStatusValue.FAILED,
     )
 
