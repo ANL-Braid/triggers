@@ -239,11 +239,6 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                             },
                             headers=queues_auth_header,
                         )
-                        msg_delete_text = await msg_delete.text()
-                        log.debug(
-                            f"message delete (msg_delete_json):= {(msg_delete_text)}"
-                        )
-
                         if 200 <= msg_delete.status < 300:
                             pass
                 else:
