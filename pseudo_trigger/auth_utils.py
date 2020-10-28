@@ -19,7 +19,7 @@ from fastapi import HTTPException
 
 from pseudo_trigger.aiohttp_session import aio_session
 from pseudo_trigger.config import get_config_val
-from pseudo_trigger.models import Token, TokenSet
+from pseudo_trigger.models import InternalTrigger, Token, TokenSet
 
 AUTH_DOMAIN = "https://auth.globus.org/"
 
@@ -94,12 +94,6 @@ class AuthInfo(object):
             return
         if required_principals.isdisjoint(set(self.identities_set)):
             raise HTTPException(status_code=401, detail="Unauthorized")
-
-    async def refresh_if_required(self, t: Token) -> Token:
-        if t.requires_refresh():
-            refresh_reply = await refresh_token(t.refresh_token)
-            t = Token(**refresh_reply)
-        return t
 
 
 def _client_auth_header(
@@ -193,11 +187,35 @@ async def dependent_token_exchange(
     return response_json
 
 
-async def refresh_token(token: str) -> Dict:
+async def get_refreshed_access_token_for_scope(
+    trigger: InternalTrigger, scope: str
+) -> Optional[str]:
+    token = trigger.token_set.dependent_tokens.get(scope)
+    if token is None:
+        return None
+    if token.requires_refresh():
+        log.debug(
+            f"trigger_id={trigger.trigger_id} Refreshing token "
+            f"...{token.access_token[:-7]} for scope {scope}"
+        )
+        refresh_reply = await refresh_token_grant(token.refresh_token)
+        expires_in = refresh_reply.pop("expires_in")
+        expiration_time = time.time() + expires_in
+        refresh_reply["expiration_time"] = expiration_time
+        token = Token(**refresh_reply)
+        log.debug(
+            f"trigger_id={trigger.trigger_id} Updated access token "
+            f"...{token.access_token[:-7]} for scope {scope}"
+        )
+        trigger.token_set.dependent_tokens[scope] = token
+    return token.access_token
+
+
+async def refresh_token_grant(refresh_token: str) -> Dict:
     url = "/token"
     params = {"grant_type": "refresh_token", "refresh_token": refresh_token}
     refresh_resp = await _perform_auth_request(
-        url, "GET", body=params, path_type="oauth2", body_type="data"
+        url, "POST", body=params, path_type="oauth2", body_type="data"
     )
     return refresh_resp
 

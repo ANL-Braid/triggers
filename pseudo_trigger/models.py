@@ -72,9 +72,7 @@ class Token(BaseModel):
 
     def requires_refresh(self) -> bool:
         now = time.time()
-        return True
-        # return now + 300 > self.expiration_time
-        # return now > self.expires_in + self.creation_time + 1800
+        return now + 300 > self.expiration_time
 
 
 class TokenSet(BaseModel):

@@ -8,6 +8,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Union
 from fastapi import HTTPException
 
 from pseudo_trigger.aiohttp_session import aio_session
+from pseudo_trigger.auth_utils import get_refreshed_access_token_for_scope
 from pseudo_trigger.expressions import eval_expressions
 from pseudo_trigger.log import setup_python_logging
 from pseudo_trigger.models import (
@@ -85,11 +86,9 @@ def _error_action_status(
     )
 
 
-async def auth_header_for_scope(
-    scope: str, trigger: InterruptedError
-) -> Dict[str, Any]:
-    action_token = trigger.token_set.dependent_tokens.get(scope)
-    req_headers = {"Authorization": f"Bearer {action_token.access_token}"}
+async def auth_header_for_scope(scope: str, trigger: InternalTrigger) -> Dict[str, Any]:
+    access_token = await get_refreshed_access_token_for_scope(trigger, scope)
+    req_headers = {"Authorization": f"Bearer {access_token}"}
     return req_headers
 
 
