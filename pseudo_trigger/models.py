@@ -94,7 +94,7 @@ class Trigger(BaseModel):
     action_url: HttpUrl
     action_scope: Optional[HttpUrl]
     event_filter: str
-    event_template: Dict[str, str]
+    event_template: Dict[str, Any]
 
 
 class ResponseTrigger(Trigger):
