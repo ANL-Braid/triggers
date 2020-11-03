@@ -100,7 +100,12 @@ async def check_action_result(
     log.info(f"Action Result for trigger_id={trigger.trigger_id}: {action_resp}")
     if 200 <= action_resp.status < 300:
         action_status_dict = await action_resp.json()
+        # Workaround for missing creator_id field in flows
+        if "creator_id" not in action_status_dict:
+            action_status_dict["creator_id"] = trigger.created_by
         if action_status_dict.get("status") in {"SUCCEEDED", "FAILED"}:
+            # Not going to release for now so that we keep them around for stats counting
+            """
             action_id = action_status_dict.get("action_id")
             auth_header = await auth_header_for_scope(trigger.action_scope, trigger)
             release_resp = await aio_session.post(
@@ -108,6 +113,7 @@ async def check_action_result(
             )
             if 200 <= release_resp.status < 300:
                 action_status_dict = await release_resp.json()
+            """
         action_status = ActionStatus(**action_status_dict)
     else:
         action_status = _error_action_status(
