@@ -74,6 +74,15 @@ def display(trigger_id: str = typer.Argument(...)):
 
 
 @trigger_app.command()
+def list():
+    auth_header = get_authorization_header_for_scope(
+        MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
+    )
+    resp = requests.get(f"{BASE_URL}", headers=auth_header)
+    echo_json(resp.json())
+
+
+@trigger_app.command()
 def enable(scope: str = typer.Option(None), trigger_id: str = typer.Argument(...)):
     if scope is None:
         get_resp = requests.get(f"{BASE_URL}/{trigger_id}")

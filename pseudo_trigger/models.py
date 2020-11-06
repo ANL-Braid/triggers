@@ -72,6 +72,10 @@ class Token(BaseModel):
 
     def requires_refresh(self) -> bool:
         now = time.time()
+        print(
+            f"DEBUG requires_refresh() (now, self.expiration_time):= {(now, self.expiration_time)}"
+        )
+
         return now + 300 > self.expiration_time
 
 

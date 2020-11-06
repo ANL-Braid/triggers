@@ -2,10 +2,11 @@ import json
 import logging
 import os
 import uuid
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Type, TypeVar, Union
 
 from boto3.dynamodb.conditions import Attr, Key
 from boto3.dynamodb.table import TableResource as DynamoTable
+from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from botocore.exceptions import ClientError, EndpointConnectionError
 from pydantic import BaseModel
 
@@ -22,6 +23,9 @@ _TRIGGER_KEY_SCHEMA = ({"AttributeName": "trigger_id", "KeyType": "HASH"},)
 _TRIGGER_ATTRIBUTE_DEFINITIONS = (
     {"AttributeName": "trigger_id", "AttributeType": "S"},
 )
+
+dynamo_serializer = TypeSerializer()
+dynamo_deserializer = TypeDeserializer()
 
 
 def create_table(
@@ -63,38 +67,118 @@ def get_table(
     return table
 
 
+T = TypeVar("T")
+
+
+def lookup_by_key(inst_class: Type[T], table: DynamoTable, **kwargs) -> Optional[T]:
+    k, v = next(iter(kwargs.items()))
+    response = table.query(KeyConditionExpression=Key(k).eq(v))
+    items = response.get("Items")
+
+    instance: Optional[T] = None
+    if len(items) > 0:
+        try:
+            instance = inst_class(**items[0])
+            return instance
+        except Exception as e:
+            log.error(f"Cannot create Trigger from {items[0]} got {str(e)}")
+    return instance
+
+
+QueryElement = Union[BaseModel, Dict]
+
+
+def query_for_class(
+    inst_class: Type[T],
+    table: DynamoTable,
+    *,
+    query_vals: Optional[Union[QueryElement, Iterable[QueryElement]]] = None,
+    **kwargs,
+) -> List[T]:
+    """Perform a scan of a dynamo table returning instances of the provided class. That
+    class must take as constructor params the properties of the items returned from the
+    scan.
+
+    The values to be queried can be provided in a variety of ways: in query_vals, there
+    can be a single instance of a dict or a pydantic BaseModel instance. If a list of
+    these is provided, the scan will return values matching any of these.
+
+    kwargs may also be provided for the query. If they are, they are treated as another
+    element of the query_vals list and so will form another condition that may be
+    matched.
+
+    The only forms of matching provided are exact match against the values or a
+    list/set/tuple of values. If a set of values is given, then the match for the
+    property is the value being in the set.
+    """
+    filter_expression = None
+    if query_vals is not None and not isinstance(query_vals, list):
+        query_vals = [query_vals]
+    if len(kwargs) > 0:
+        if not query_vals:
+            query_vals = [kwargs]
+        else:
+            query_vals.append(kwargs)
+    for query_val in query_vals:
+        this_filter_expression = None
+        if not isinstance(query_val, dict):
+            try:
+                query_val = query_val.dict()
+            except Exception as e:
+                log.error(
+                    f"Failed converting {query_val} via dict() due to {str(e)}, skipping..."
+                )
+                continue
+        for k, v in query_val.items():
+            if isinstance(v, (tuple, list, set)):
+                this_attr = Attr(k).is_in(v)
+            else:
+                this_attr = Attr(k).eq(v)
+            if this_filter_expression is None:
+                this_filter_expression = this_attr
+            else:
+                this_filter_expression = this_filter_expression & this_attr
+            print(
+                f"DEBUG building filter (this_filter_expression):= {(this_filter_expression)}"
+            )
+
+        if filter_expression is None:
+            filter_expression = this_filter_expression
+        else:
+            filter_expression = filter_expression | this_filter_expression
+        print(
+            f"DEBUG building outer filter (filter_expression):= {(filter_expression)}"
+        )
+
+    response = table.scan(FilterExpression=filter_expression)
+    # response = table.scan(filter_expression)
+    items = response.get("Items", [])
+    instances: List[T] = []
+    for item in items:
+        instances.append(inst_class(**item))
+    return instances
+
+
 def lookup_trigger(trigger_id: str) -> Optional[InternalTrigger]:
     table = get_table(
         get_config_val("aws.dynamodb.table_name"),
     )
-    response = table.query(KeyConditionExpression=Key("trigger_id").eq(trigger_id))
-    items = response.get("Items")
-    if len(items) == 0:
-        return None
-    try:
-        trigger = InternalTrigger(**items[0])
-    except Exception as e:
-        log.error(f"Cannot create Trigger from {items[0]} got {str(e)}")
-
+    trigger = lookup_by_key(InternalTrigger, table, trigger_id=trigger_id)
     return trigger
 
 
-"""
-    trigger = _triggers.get(trigger_id)
-    if trigger is None:
-        raise HTTPException(
-            status_code=404, detail=f"No trigger with id '{trigger_id}'"
-        )
-"""
-
-
-def scan_triggers() -> List[InternalTrigger]:
+def scan_triggers(
+    query_vals: Optional[Union[QueryElement, Iterable[QueryElement]]] = None, **kwargs
+) -> List[InternalTrigger]:
     table = get_table(
         get_config_val("aws.dynamodb.table_name"),
     )
+    return query_for_class(InternalTrigger, table, query_vals=query_vals, **kwargs)
 
 
 def _to_dynamo_dict(model: BaseModel) -> Dict[str, Any]:
+    # By encoding then decoding JSON, we get string or other appropriate representations
+    # that we can serialize into dynamo.
     json_str = model.json()
     model_dict = json.loads(json_str)
     return model_dict

@@ -14,7 +14,9 @@ _ENVIRONMENT_SOURCES = [
     "TRIGGER_ENVIRONMENT",
 ]
 
-_CONFIG_ROOT = Path(__name__).resolve().parent / "config"
+_CONFIG_ROOT = Path(__file__).resolve().parent.parent / "config"
+print(f"DEBUG  (_CONFIG_ROOT, __file__):= {(_CONFIG_ROOT, __file__)}")
+
 
 # Precedence goes up, so values from last in the list overwrites values from first in the
 # list

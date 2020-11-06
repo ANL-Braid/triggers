@@ -30,8 +30,8 @@ class AuthInfo(object):
     def __init__(self, bearer_token: str):
         self.access_token = bearer_token
         self._usertoken: Optional[Token] = None
-        self._token_resp = {}
-        self._dependent_tokens: Dict[str, Token] = None
+        self._token_resp: Dict = {}
+        self._dependent_tokens: Optional[List[Token]] = None
         self._tokenset: Optional[TokenSet] = None
 
     @property
@@ -68,7 +68,7 @@ class AuthInfo(object):
                     "expiration_time"
                 ] = time.time() + dep_token_result.pop("expires_in")
                 self._dependent_tokens.append(Token(**dep_token_result))
-            return self._dependent_tokens
+        return self._dependent_tokens
 
     @property
     async def dependent_tokens_by_scope(self) -> Dict[str, Token]:
@@ -168,8 +168,7 @@ async def introspect_token(token: str, client_id: Optional[str] = None) -> Dict:
         if response_json.get("active", False):
             return response_json
     msg = f"Expired or invalid Bearer token {response_json}"
-    print(msg)
-    log.error(msg)
+    log.warning(msg)
     raise HTTPException(status_code=401, detail=msg)
 
 
@@ -190,8 +189,11 @@ async def dependent_token_exchange(
 async def get_refreshed_access_token_for_scope(
     trigger: InternalTrigger, scope: str
 ) -> Optional[str]:
+    print(f"DEBUG get_refreshed (trigger, scope):= {(trigger, scope)}")
+
     token = trigger.token_set.dependent_tokens.get(scope)
     if token is None:
+        print(f"No token for scope {scope}")
         return None
     if token.requires_refresh():
         log.debug(

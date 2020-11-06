@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Any, Mapping, Optional, Union
+from typing import Any, List, Mapping, Optional, Union
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 
@@ -16,6 +16,7 @@ from pseudo_trigger.models import (
 from pseudo_trigger.persistence import (
     lookup_trigger,
     remove_trigger,
+    scan_triggers,
     store_trigger,
     update_trigger,
 )
@@ -107,16 +108,25 @@ async def _lookup_trigger(
 
 @app.get("/triggers/{trigger_id}", response_model=ResponseTrigger)
 async def get_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     return await _lookup_trigger(trigger_id)
 
 
+@app.get("/triggers", response_model=List[ResponseTrigger])
+async def list_triggers(
+    auth_info: AuthInfo = Depends(globus_auth_dependency),
+) -> List[InternalTrigger]:
+    # Make sure the token's been introspected
+    token_resp = await auth_info.token_resp
+    print(f"DEBUG  (token_resp):= {(token_resp)}")
+    triggers = scan_triggers(created_by=auth_info.sub)
+    return triggers
+
+
 @app.post("/triggers/{trigger_id}/enable", response_model=ResponseTrigger)
 async def enable_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
 
@@ -132,8 +142,7 @@ async def enable_trigger(
 
 @app.post("/triggers/{trigger_id}/disable", response_model=ResponseTrigger)
 async def disable_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
     set_trigger_state(trigger_id, TriggerState.PENDING)
@@ -153,8 +162,7 @@ async def send_event(trigger_id: str, body: Union[str, Mapping[str, Any]]) -> No
 
 @app.delete("/triggers/{trigger_id}", response_model=ResponseTrigger)
 async def delete_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
     prev_state = set_trigger_state(trigger_id, TriggerState.DELETING)

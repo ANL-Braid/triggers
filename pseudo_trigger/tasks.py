@@ -88,6 +88,12 @@ def _error_action_status(
 
 async def auth_header_for_scope(scope: str, trigger: InternalTrigger) -> Dict[str, Any]:
     access_token = await get_refreshed_access_token_for_scope(trigger, scope)
+    if access_token is None:
+        log.warning(
+            f"trigger_id={trigger.trigger_id} Unable to get access token for "
+            f"scope {scope}"
+        )
+        return {}
     req_headers = {"Authorization": f"Bearer {access_token}"}
     return req_headers
 
@@ -212,11 +218,19 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
             event_processing_tasks: Set[asyncio.Task] = set()
             action_status_tasks: Set[asyncio.Task] = set()
 
-            if trigger_state_rec.state is TriggerState.ENABLED:
+            if (
+                trigger_state_rec.state is TriggerState.ENABLED
+                and trigger.queue_id is not None
+            ):
                 # Do this each time to allow for refresh
                 queues_auth_header = await auth_header_for_scope(
                     QUEUES_RECEIVE_SCOPE, trigger
                 )
+                if not queues_auth_header:
+                    trigger.last_error_action_status = _error_action_status(
+                        "Unable to get access token for queues access"
+                    )
+                    trigger.state = TriggerState.PENDING
                 msgs_response = await aio_session.get(
                     queue_msgs_url + "?max_messages=10",
                     headers=queues_auth_header,
