@@ -12,8 +12,11 @@ app = typer.Typer()
 trigger_app = typer.Typer(name="trigger")
 app.add_typer(trigger_app, name="trigger")
 
-BASE_URL = os.environ.get("PSEUDO_TRIGGER_URL", "http://localhost:5001/triggers")
-
+_DEFAULT_BASE_URL = "http://localhost:5001/triggers"
+BASE_URL = os.environ.get("PSEUDO_TRIGGER_URL", _DEFAULT_BASE_URL)
+_base_url_argument = typer.Argument(
+    _DEFAULT_BASE_URL, envvar="PSEUDO_TRIGGER_URL", hidden=True
+)
 CLI_NATIVE_CLIENT_ID = "1602fba0-9893-49cb-a2fe-aa064b452462"
 MANAGE_TRIGGERS_SCOPE = "https://auth.globus.org/scopes/5292be17-96f0-4ab6-957a-ecd516a1759e/manage_triggers"
 
@@ -23,16 +26,44 @@ def echo_json(json_map: Mapping) -> None:
     typer.echo(out)
 
 
+def _string_or_file(in_str: str) -> str:
+    try:
+        with open(in_str, "r") as f:
+            in_str = f.read()
+    except Exception:
+        pass  # We assume it isn't a file and go on with our lives
+    return in_str
+
+
 @trigger_app.command()
 def create(
     queue_id: str = typer.Option(...),
     action_url: str = typer.Option(...),
-    event_filter: str = typer.Option(...),
-    event_template: str = typer.Option(...),
+    event_filter: str = typer.Option(
+        "True",
+        callback=_string_or_file,
+        help=(
+            "An expression to be matched against the properties of an incoming "
+            "Event to determine if an Action invocation should be performed."
+        ),
+    ),
+    event_template: str = typer.Option(
+        ...,
+        callback=_string_or_file,
+        help=(
+            "The template transforming the fields of the incoming Event into "
+            "fields for the Body fo the Action invocation."
+        ),
+    ),
     action_scope: str = typer.Option(
         "",
-        help="Optionally provide the scope for the action to be invoked. If not provided, it will be determined by introspecting the action-url",
+        help=(
+            "Optionally provide the scope for the action to be invoked. "
+            "If not provided, it will be determined by introspecting the action-url."
+        ),
+        show_default=False,
     ),
+    base_url: str = _base_url_argument,
 ):
     body = {
         "queue_id": queue_id,
@@ -60,55 +91,70 @@ def create(
     auth_header = get_authorization_header_for_scope(
         MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
     )
-    resp = requests.post(BASE_URL, json=body, headers=auth_header)
+    resp = requests.post(base_url, json=body, headers=auth_header)
     echo_json(resp.json())
 
 
 @trigger_app.command()
-def display(trigger_id: str = typer.Argument(...)):
+def display(
+    trigger_id: str = typer.Argument(...),
+    base_url: str = _base_url_argument,
+):
     auth_header = get_authorization_header_for_scope(
         MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
     )
-    resp = requests.get(f"{BASE_URL}/{trigger_id}", headers=auth_header)
+    resp = requests.get(f"{base_url}/{trigger_id}", headers=auth_header)
     echo_json(resp.json())
 
 
 @trigger_app.command()
-def list():
+def list(
+    base_url: str = _base_url_argument,
+):
     auth_header = get_authorization_header_for_scope(
         MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
     )
-    resp = requests.get(f"{BASE_URL}", headers=auth_header)
+    resp = requests.get(f"{base_url}", headers=auth_header)
     echo_json(resp.json())
 
 
 @trigger_app.command()
-def enable(scope: str = typer.Option(None), trigger_id: str = typer.Argument(...)):
+def enable(
+    scope: str = typer.Option(None),
+    trigger_id: str = typer.Argument(...),
+    base_url: str = _base_url_argument,
+):
     if scope is None:
-        get_resp = requests.get(f"{BASE_URL}/{trigger_id}")
+        get_resp = requests.get(f"{base_url}/{trigger_id}")
         if get_resp.status_code == 200:
             scope = get_resp.json().get("globus_auth_scope")
 
     auth_header = get_authorization_header_for_scope(scope, CLI_NATIVE_CLIENT_ID)
-    resp = requests.post(f"{BASE_URL}/{trigger_id}/enable", headers=auth_header)
+    resp = requests.post(f"{base_url}/{trigger_id}/enable", headers=auth_header)
     echo_json(resp.json())
 
 
 @trigger_app.command()
-def disable(trigger_id: str = typer.Argument(...)):
+def disable(
+    trigger_id: str = typer.Argument(...),
+    base_url: str = _base_url_argument,
+):
     auth_header = get_authorization_header_for_scope(
         MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
     )
-    resp = requests.post(f"{BASE_URL}/{trigger_id}/disable", headers=auth_header)
+    resp = requests.post(f"{base_url}/{trigger_id}/disable", headers=auth_header)
     echo_json(resp.json())
 
 
 @trigger_app.command()
-def delete(trigger_id: str = typer.Argument(...)):
+def delete(
+    trigger_id: str = typer.Argument(...),
+    base_url: str = _base_url_argument,
+):
     auth_header = get_authorization_header_for_scope(
         MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
     )
-    resp = requests.delete(f"{BASE_URL}/{trigger_id}", headers=auth_header)
+    resp = requests.delete(f"{base_url}/{trigger_id}", headers=auth_header)
     echo_json(resp.json())
 
 

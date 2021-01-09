@@ -138,20 +138,13 @@ def query_for_class(
                 this_filter_expression = this_attr
             else:
                 this_filter_expression = this_filter_expression & this_attr
-            print(
-                f"DEBUG building filter (this_filter_expression):= {(this_filter_expression)}"
-            )
 
         if filter_expression is None:
             filter_expression = this_filter_expression
         else:
             filter_expression = filter_expression | this_filter_expression
-        print(
-            f"DEBUG building outer filter (filter_expression):= {(filter_expression)}"
-        )
 
     response = table.scan(FilterExpression=filter_expression)
-    # response = table.scan(filter_expression)
     items = response.get("Items", [])
     instances: List[T] = []
     for item in items:

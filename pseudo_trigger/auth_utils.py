@@ -39,6 +39,8 @@ class AuthInfo(object):
         if not self._token_resp:
             if self.access_token:
                 token_resp = await introspect_token(self.access_token)
+                print(f"DEBUG  (token_resp):= {(token_resp)}")
+
                 self._token_resp = token_resp
                 for k, v in self._token_resp.items():
                     setattr(self, k, v)
@@ -47,16 +49,17 @@ class AuthInfo(object):
 
     @property
     async def user_token(self) -> Token:
-        _ = await self.token_resp
-        t = Token(
-            access_token=self.access_token,
-            refresh_token="",
-            scope=self.scope,
-            resource_server="",
-            expiration_time=self.exp,
-            token_type=self.token_type,
-        )
-        return t
+        if self._usertoken is None:
+            _ = await self.token_resp
+            self._usertoken = Token(
+                access_token=self.access_token,
+                refresh_token="",
+                scope=self.scope,
+                resource_server="",
+                expiration_time=self.exp,
+                token_type=self.token_type,
+            )
+        return self._usertoken
 
     @property
     async def dependent_tokens(self) -> List[Token]:
@@ -189,14 +192,13 @@ async def dependent_token_exchange(
 async def get_refreshed_access_token_for_scope(
     trigger: InternalTrigger, scope: str
 ) -> Optional[str]:
-    print(f"DEBUG get_refreshed (trigger, scope):= {(trigger, scope)}")
-
     token = trigger.token_set.dependent_tokens.get(scope)
     if token is None:
-        print(f"No token for scope {scope}")
+        log.warn(f"No token for scope {scope}")
         return None
-    if token.requires_refresh():
-        log.debug(
+    refresh = token.requires_refresh()
+    if refresh:
+        log.info(
             f"trigger_id={trigger.trigger_id} Refreshing token "
             f"...{token.access_token[:-7]} for scope {scope}"
         )
@@ -205,7 +207,7 @@ async def get_refreshed_access_token_for_scope(
         expiration_time = time.time() + expires_in
         refresh_reply["expiration_time"] = expiration_time
         token = Token(**refresh_reply)
-        log.debug(
+        log.info(
             f"trigger_id={trigger.trigger_id} Updated access token "
             f"...{token.access_token[:-7]} for scope {scope}"
         )

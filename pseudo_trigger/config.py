@@ -15,7 +15,6 @@ _ENVIRONMENT_SOURCES = [
 ]
 
 _CONFIG_ROOT = Path(__file__).resolve().parent.parent / "config"
-print(f"DEBUG  (_CONFIG_ROOT, __file__):= {(_CONFIG_ROOT, __file__)}")
 
 
 # Precedence goes up, so values from last in the list overwrites values from first in the
@@ -53,7 +52,8 @@ def _load_config() -> Dict[str, Any]:
     for config_file in _CONFIG_FILE_TEMPLATES:
         config_file_path = _CONFIG_ROOT / config_file.format(env)
         try:
-            config_info = toml.load(str(_CONFIG_ROOT / config_file_path))
+            config_info = toml.load(str(config_file_path))
+            print(f"LOADED Config from {config_file_path}")
             _deep_update(_config, config_info)
         except Exception as e:
             print(

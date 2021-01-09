@@ -31,6 +31,11 @@ def eval_expressions(
         short_key = key[:-2]  # strip off the '.=' suffix
         try:
             evaluator.names = names
+            # Use below instead of above if we want to evaluate missing property names in
+            # expressions as None rather than throwing an exception
+
+            # evaluator.names = lambda x: names.get(x.id)
+
             val = evaluator.eval(val)
             result_params[short_key] = val
         except TypeError as te:
