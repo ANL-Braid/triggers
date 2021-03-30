@@ -101,9 +101,8 @@ The result from running enable should be the same state of the Trigger with the 
 
 We can now send messages to the Queue and thus to the trigger:
 
-``globus-automate queue message-send <queue_id>``
+``globus-automate queue message-send <queue_id> --message '{"Hello": "World"}'``
 
-This command asks for a message. Input ``'{"Hello": "World"}' `` there.
 There's no immediate feedback that anything happened here, but the Trigger is monitoring the queue and will, assuming the filter evaluated to True, invoke the Action.
 
 We can check to see if this occurred by running:
