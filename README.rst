@@ -93,7 +93,7 @@ If the content of the message does not parse as JSON, the entire content is prov
 
 Upon creation of the Trigger, the Trigger will be in the "PENDING" state. That state indicates that it is exists in the system, but it is not monitoring the queue. To do this, we must *enable* the Trigger. We do this with:
 
-``pseudo-trigger enable <trigger-id>`` where the value for ``<trigger-id>`` is shown (as field name ``trigger_id``) in the output from the trigger ``create`` call.
+``pseudo-trigger trigger enable <trigger-id>`` where the value for ``<trigger-id>`` is shown (as field name ``trigger_id``) in the output from the trigger ``create`` call.
 
 Upon enabling the trigger, the trigger service will require that you consent to having it read messages from the Queue and invoke the Action. So, a browser Globus Auth consent is likely to pop up here. The trigger service will be caching the tokens created here and refreshing them as needed (not quite there yet...).
 
@@ -101,7 +101,7 @@ The result from running enable should be the same state of the Trigger with the 
 
 We can now send messages to the Queue and thus to the trigger:
 
-``globus-automate queue send --message '{"Hello": "World"}' <queue_id>``
+``globus-automate queue message-send <queue_id> --message '{"Hello": "World"}'``
 
 There's no immediate feedback that anything happened here, but the Trigger is monitoring the queue and will, assuming the filter evaluated to True, invoke the Action.
 
