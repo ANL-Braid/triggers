@@ -1,16 +1,16 @@
 import json
 import os
-from typing import Mapping
+from typing import Any, Dict, Mapping, Optional
 
 import requests
 import typer
 from globus_automate_client import create_flows_client
 
-from .token_management import get_authorization_header_for_scope
+from .auth import get_access_token_for_scope, get_current_user, logout, revoke_login
 
-app = typer.Typer()
-trigger_app = typer.Typer(name="trigger")
-app.add_typer(trigger_app, name="trigger")
+cli_app = typer.Typer()
+trigger_app = typer.Typer(name="trigger", short_help="Manage your Triggers")
+cli_app.add_typer(trigger_app, name="trigger")
 
 _DEFAULT_BASE_URL = "http://localhost:5001/triggers"
 BASE_URL = os.environ.get("PSEUDO_TRIGGER_URL", _DEFAULT_BASE_URL)
@@ -19,6 +19,10 @@ _base_url_argument = typer.Argument(
 )
 CLI_NATIVE_CLIENT_ID = "1602fba0-9893-49cb-a2fe-aa064b452462"
 MANAGE_TRIGGERS_SCOPE = "https://auth.globus.org/scopes/5292be17-96f0-4ab6-957a-ecd516a1759e/manage_triggers"
+
+verbosity_option = typer.Option(
+    False, "--verbose", "-v", help="Run with increased verbosity", show_default=False
+)
 
 
 def echo_json(json_map: Mapping) -> None:
@@ -33,6 +37,16 @@ def _string_or_file(in_str: str) -> str:
     except Exception:
         pass  # We assume it isn't a file and go on with our lives
     return in_str
+
+
+def get_authorization_header_for_scope(
+    scope: str, client_id: str = CLI_NATIVE_CLIENT_ID
+) -> Optional[Dict[str, Any]]:
+    scope_str = get_access_token_for_scope(scope, client_id=client_id)
+    if scope_str is not None:
+        return {"Authorization": f"Bearer {scope_str}"}
+    else:
+        return None
 
 
 @trigger_app.command()
@@ -158,8 +172,38 @@ def delete(
     echo_json(resp.json())
 
 
+session_app = typer.Typer(
+    name="session", short_help="Manage your session with the Triggers Command Line"
+)
+
+
+@session_app.command("whoami")
+def session_whoami(verbose: bool = verbosity_option):
+    user = get_current_user()
+    if verbose:
+        echo_json(user)
+    else:
+        output = user["preferred_username"]
+    typer.secho(output, fg=typer.colors.GREEN)
+
+
+@session_app.command("logout")
+def session_logout():
+    logout()
+    typer.secho("Logged Out", fg=typer.colors.GREEN)
+
+
+@session_app.command("revoke")
+def session_revoke():
+    revoke_login()
+    typer.secho("All stored consents have been revoked", fg=typer.colors.GREEN)
+
+
+cli_app.add_typer(session_app)
+
+
 def main():
-    app()
+    cli_app()
 
 
 if __name__ == "__main__":

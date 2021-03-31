@@ -240,7 +240,7 @@ def get_authorizer_for_scope(
     return authorizers.get(_get_base_scope(scope))
 
 
-def get_access_token_for_scope(scope: str) -> Optional[str]:
+def get_access_token_for_scope(scope: str, client_id: str = CLIENT_ID) -> Optional[str]:
     authorizer = get_authorizers_for_scopes([scope]).get(_get_base_scope(scope))
     if not authorizer:
         click.echo(f"couldn't obtain authorizer for scope: {scope}", err=True)
