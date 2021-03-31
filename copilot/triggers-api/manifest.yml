@@ -14,8 +14,8 @@ image:
   port: 5001
 
 http:
-  # Requests to this path will be forwarded to your service. 
-  # To match all requests you can use the "/" path. 
+  # Requests to this path will be forwarded to your service.
+  # To match all requests you can use the "/" path.
   path: '/'
   # You can specify a custom health check path. The default is "/"
   # healthcheck: '/'
