@@ -1,12 +1,24 @@
 import json
 import logging
+import numbers
 import os
 import uuid
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Type, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+)
 
 from boto3.dynamodb.conditions import Attr, Key
 from boto3.dynamodb.table import TableResource as DynamoTable
-from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
+from boto3.dynamodb.types import Binary, Decimal
 from botocore.exceptions import ClientError, EndpointConnectionError
 from pydantic import BaseModel
 
@@ -23,9 +35,6 @@ _TRIGGER_KEY_SCHEMA = ({"AttributeName": "trigger_id", "KeyType": "HASH"},)
 _TRIGGER_ATTRIBUTE_DEFINITIONS = (
     {"AttributeName": "trigger_id", "AttributeType": "S"},
 )
-
-dynamo_serializer = TypeSerializer()
-dynamo_deserializer = TypeDeserializer()
 
 
 def create_table(
@@ -70,6 +79,52 @@ def get_table(
 T = TypeVar("T")
 
 
+def _iterate_dict(
+    val: Optional[Any], val_transformer: Callable[[Any], Any]
+) -> Optional[Any]:
+    """Iterate over a nested (dict/list) structure, and call the transformer on any simple
+    (non-dict/list) values
+
+    """
+    if isinstance(val, dict):
+        val = {k: _iterate_dict(v, val_transformer) for k, v in val.items()}
+    elif isinstance(val, list):
+        val = [_iterate_dict(v, val_transformer) for v in val]
+    else:
+        val = val_transformer(val)
+    return val
+
+
+def _from_dynamo_dict(d: Dict[str, Any]) -> Dict[str, Any]:
+    def dynamo_deserialize(val: Any) -> Any:
+        if isinstance(val, Decimal):
+            val = float(val)
+            if int(val) == val:
+                val = int(val)
+        elif isinstance(val, Binary):
+            val = val.value
+        return val
+
+    return _iterate_dict(d, dynamo_deserialize)
+
+
+def _dict_to_dynamo_dict(d: Dict[str, Any]) -> Dict[str, Any]:
+    def dynamo_serialize(val: Any) -> Any:
+        if isinstance(val, numbers.Number):
+            val = Decimal(val)
+        elif isinstance(val, (bytes, bytearray)):
+            val = Binary(val)
+        elif val is not None:
+            val = str(val)
+        return val
+
+    return _iterate_dict(d, dynamo_serialize)
+
+
+def _pydantic_model_to_dynamo_dict(model: BaseModel) -> Dict[str, Any]:
+    return _dict_to_dynamo_dict(model.dict())
+
+
 def lookup_by_key(inst_class: Type[T], table: DynamoTable, **kwargs) -> Optional[T]:
     k, v = next(iter(kwargs.items()))
     response = table.query(KeyConditionExpression=Key(k).eq(v))
@@ -78,7 +133,8 @@ def lookup_by_key(inst_class: Type[T], table: DynamoTable, **kwargs) -> Optional
     instance: Optional[T] = None
     if len(items) > 0:
         try:
-            instance = inst_class(**items[0])
+            item = _from_dynamo_dict(items[0])
+            instance = inst_class(**item)
             return instance
         except Exception as e:
             log.error(f"Cannot create Trigger from {items[0]} got {str(e)}")
@@ -169,21 +225,13 @@ def scan_triggers(
     return query_for_class(InternalTrigger, table, query_vals=query_vals, **kwargs)
 
 
-def _to_dynamo_dict(model: BaseModel) -> Dict[str, Any]:
-    # By encoding then decoding JSON, we get string or other appropriate representations
-    # that we can serialize into dynamo.
-    json_str = model.json()
-    model_dict = json.loads(json_str)
-    return model_dict
-
-
 def store_trigger(trigger: InternalTrigger) -> InternalTrigger:
     table = get_table(
         get_config_val("aws.dynamodb.table_name"),
     )
     if trigger.trigger_id is None:
         trigger.trigger_id = str(uuid.uuid4())
-    trigger_dict = _to_dynamo_dict(trigger)
+    trigger_dict = _pydantic_model_to_dynamo_dict(trigger)
     table.put_item(Item=trigger_dict)
     return trigger
 
@@ -194,7 +242,7 @@ def update_trigger(trigger: InternalTrigger) -> InternalTrigger:
     )
     if trigger.trigger_id is None:
         trigger.trigger_id = str(uuid.uuid4())
-    trigger_dict = _to_dynamo_dict(trigger)
+    trigger_dict = _pydantic_model_to_dynamo_dict(trigger)
     table.put_item(Item=trigger_dict)
     return trigger
 
@@ -210,6 +258,7 @@ def remove_trigger(trigger_id: str) -> InternalTrigger:
         ReturnValues="ALL_OLD",
     )
     item = del_resp.get("Attributes")
+    item = _from_dynamo_dict(item)
     return InternalTrigger(**item)
 
 
@@ -229,7 +278,7 @@ def enum_triggers(**kwargs) -> List[InternalTrigger]:
             filter_expression = filter_expression & this_filter_expression
     response = table.scan(FilterExpression=filter_expression)
     items = response.get("Items", [])
-    ret_items = [InternalTrigger(**i) for i in items]
+    ret_items = [InternalTrigger(**_from_dynamo_dict(i)) for i in items]
     return ret_items
 
 

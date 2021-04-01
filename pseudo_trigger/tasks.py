@@ -283,7 +283,7 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                 outstanding_action_ids = set()
                 for action_status in action_statuses:
                     if action_status is not None:
-                        if not action_status.is_complete:
+                        if not action_status.is_complete():
                             outstanding_action_ids.add(action_status.action_id)
                         trigger.last_action_status = action_status
                         if trigger.last_action_statuses is None:

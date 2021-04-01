@@ -127,8 +127,7 @@ async def list_triggers(
     auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> List[InternalTrigger]:
     # Make sure the token's been introspected
-    token_resp = await auth_info.token_resp
-    print(f"DEBUG  (token_resp):= {(token_resp)}")
+    _ = await auth_info.token_resp
     triggers = scan_triggers(created_by=auth_info.sub)
     return triggers
 
@@ -142,9 +141,6 @@ async def enable_trigger(
 
     trigger.state = TriggerState.ENABLED
     trigger.token_set = await auth_info.token_set
-    dependent_scoeps = trigger.token_set.dependent_tokens.keys()
-    print(f"DEBUG  (dependent_scopes):= {(dependent_scoeps)}")
-
     update_trigger(trigger)
 
     set_trigger_state(trigger_id, TriggerState.ENABLED)

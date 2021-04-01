@@ -11,7 +11,18 @@ from typing import Any, Dict, List, Mapping, Optional
 from pydantic import BaseModel, Field, HttpUrl
 
 
-class ActionStatusValue(Enum):
+class BaseEnum(str, Enum):
+    """
+    A pythonic Enum class implementation that removes the need to access a
+    "value" attribute to get an Enum's representation.
+    http://www.cosmicpython.com/blog/2020-10-27-i-hate-enums.html
+    """
+
+    def __str__(self) -> str:
+        return str.__str__(self)
+
+
+class ActionStatusValue(BaseEnum):
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
     ACTIVE = "ACTIVE"
@@ -82,7 +93,7 @@ class TokenSet(BaseModel):
 
 
 @unique
-class TriggerState(Enum):
+class TriggerState(BaseEnum):
     PENDING = "PENDING"
     ENABLED = "ENABLED"
     NO_QUEUE = "NO_QUEUE"
@@ -91,6 +102,9 @@ class TriggerState(Enum):
 
 
 class Trigger(BaseModel):
+    class Config:
+        use_enum_values = True
+
     queue_id: uuid.UUID
     action_url: HttpUrl
     action_scope: Optional[HttpUrl]
