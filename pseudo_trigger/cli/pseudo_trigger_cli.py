@@ -1,18 +1,23 @@
 import json
 import os
-from typing import Any, Dict, Mapping, Optional
+from typing import Mapping
 
-import requests
 import typer
-from globus_automate_client import create_flows_client
+from globus_sdk import GlobusAPIError
 
-from .auth import get_access_token_for_scope, get_current_user, logout, revoke_login
+from pseudo_trigger.sdk import (
+    TriggerClient,
+    create_trigger_client,
+    get_current_user,
+    logout,
+    revoke_login,
+)
 
 cli_app = typer.Typer()
 trigger_app = typer.Typer(name="trigger", short_help="Manage your Triggers")
 cli_app.add_typer(trigger_app, name="trigger")
 
-_DEFAULT_BASE_URL = "http://localhost:5001/triggers"
+_DEFAULT_BASE_URL = "https://triggers-api.test.triggers.automate.globuscs.info"
 BASE_URL = os.environ.get("PSEUDO_TRIGGER_URL", _DEFAULT_BASE_URL)
 _base_url_argument = typer.Argument(
     _DEFAULT_BASE_URL, envvar="PSEUDO_TRIGGER_URL", hidden=True
@@ -27,7 +32,11 @@ verbosity_option = typer.Option(
 
 def echo_json(json_map: Mapping) -> None:
     out = json.dumps(json_map, indent=2)
-    typer.echo(out)
+    typer.echo(out, color=typer.colors.GREEN)
+
+
+def echo_error(err: GlobusAPIError) -> None:
+    typer.echo(err.message, color=typer.colors.RED)
 
 
 def _string_or_file(in_str: str) -> str:
@@ -39,14 +48,8 @@ def _string_or_file(in_str: str) -> str:
     return in_str
 
 
-def get_authorization_header_for_scope(
-    scope: str, client_id: str = CLI_NATIVE_CLIENT_ID
-) -> Optional[Dict[str, Any]]:
-    scope_str = get_access_token_for_scope(scope, client_id=client_id)
-    if scope_str is not None:
-        return {"Authorization": f"Bearer {scope_str}"}
-    else:
-        return None
+def _get_trigger_client(base_url: str) -> TriggerClient:
+    return create_trigger_client(CLI_NATIVE_CLIENT_ID, base_url)
 
 
 @trigger_app.command()
@@ -79,34 +82,14 @@ def create(
     ),
     base_url: str = _base_url_argument,
 ):
-    body = {
-        "queue_id": queue_id,
-        "action_url": action_url,
-        "event_filter": event_filter,
-    }
-    body["event_template"] = json.loads(event_template)
-    if action_scope:
-        body["action_scope"] = action_scope
-    elif action_url.startswith("https://flows.globus.org"):
-        # If the action url is for the flows service, we will attempt to do a lookup in
-        # the flows service, but that requires authentication
-        fc = create_flows_client(CLI_NATIVE_CLIENT_ID)
-        _, flow_id = action_url.rsplit("/", 1)
-        print(f"Retrieving scope for Flow id: {flow_id}...")
-        flow_description = fc.get_flow(flow_id)
-        action_scope = flow_description.get("globus_auth_scope")
-        if action_scope:
-            typer.echo(f"Scope is {action_scope}")
-            body["action_scope"] = action_scope
-        else:
-            typer.echo(f"Failed to get scope")
-            raise typer.Exit(code=1)
-
-    auth_header = get_authorization_header_for_scope(
-        MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
-    )
-    resp = requests.post(base_url, json=body, headers=auth_header)
-    echo_json(resp.json())
+    tc = _get_trigger_client(base_url)
+    try:
+        resp = tc.create(
+            queue_id, action_url, event_filter, event_template, action_scope
+        )
+        echo_json(resp.data)
+    except GlobusAPIError as gae:
+        echo_error(gae)
 
 
 @trigger_app.command()
@@ -114,22 +97,24 @@ def display(
     trigger_id: str = typer.Argument(...),
     base_url: str = _base_url_argument,
 ):
-    auth_header = get_authorization_header_for_scope(
-        MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
-    )
-    resp = requests.get(f"{base_url}/{trigger_id}", headers=auth_header)
-    echo_json(resp.json())
+    tc = _get_trigger_client(base_url)
+    try:
+        resp = tc.lookup(trigger_id)
+        echo_json(resp.data)
+    except GlobusAPIError as gae:
+        echo_error(gae)
 
 
 @trigger_app.command()
 def list(
     base_url: str = _base_url_argument,
 ):
-    auth_header = get_authorization_header_for_scope(
-        MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
-    )
-    resp = requests.get(f"{base_url}", headers=auth_header)
-    echo_json(resp.json())
+    tc = _get_trigger_client(base_url)
+    try:
+        resp = tc.list()
+        echo_json(resp.data)
+    except GlobusAPIError as gae:
+        echo_error(gae)
 
 
 @trigger_app.command()
@@ -138,14 +123,12 @@ def enable(
     trigger_id: str = typer.Argument(...),
     base_url: str = _base_url_argument,
 ):
-    if scope is None:
-        get_resp = requests.get(f"{base_url}/{trigger_id}")
-        if get_resp.status_code == 200:
-            scope = get_resp.json().get("globus_auth_scope")
-
-    auth_header = get_authorization_header_for_scope(scope, CLI_NATIVE_CLIENT_ID)
-    resp = requests.post(f"{base_url}/{trigger_id}/enable", headers=auth_header)
-    echo_json(resp.json())
+    tc = _get_trigger_client(base_url)
+    try:
+        resp = tc.enable(trigger_id, scope=scope)
+        echo_json(resp.data)
+    except GlobusAPIError as gae:
+        echo_error(gae)
 
 
 @trigger_app.command()
@@ -153,11 +136,12 @@ def disable(
     trigger_id: str = typer.Argument(...),
     base_url: str = _base_url_argument,
 ):
-    auth_header = get_authorization_header_for_scope(
-        MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
-    )
-    resp = requests.post(f"{base_url}/{trigger_id}/disable", headers=auth_header)
-    echo_json(resp.json())
+    tc = _get_trigger_client(base_url)
+    try:
+        resp = tc.disable(trigger_id)
+        echo_json(resp.data)
+    except GlobusAPIError as gae:
+        echo_error(gae)
 
 
 @trigger_app.command()
@@ -165,11 +149,12 @@ def delete(
     trigger_id: str = typer.Argument(...),
     base_url: str = _base_url_argument,
 ):
-    auth_header = get_authorization_header_for_scope(
-        MANAGE_TRIGGERS_SCOPE, CLI_NATIVE_CLIENT_ID
-    )
-    resp = requests.delete(f"{base_url}/{trigger_id}", headers=auth_header)
-    echo_json(resp.json())
+    tc = _get_trigger_client(base_url)
+    try:
+        resp = tc.remove(trigger_id)
+        echo_json(resp.data)
+    except GlobusAPIError as gae:
+        echo_error(gae)
 
 
 session_app = typer.Typer(
