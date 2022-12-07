@@ -7,9 +7,9 @@ from base64 import b64encode
 import cachetools
 from fastapi import HTTPException
 
-from pseudo_trigger.aiohttp_session import aio_session
-from pseudo_trigger.config import get_config_val
-from pseudo_trigger.models import InternalTrigger, Token, TokenSet
+from braid_triggers.aiohttp_session import aio_session
+from braid_triggers.config import get_config_val
+from braid_triggers.models import InternalTrigger, Token, TokenSet
 
 from .settings import get_settings
 
@@ -272,12 +272,12 @@ def _gen_scope_suffix(dependent_scope_strings: list[str]) -> str:
     """
     Really, any unique string is ok here
     """
-    scope_suffix = "pseudo_trigger"
+    scope_suffix = "braid_triggers"
     replacements = [("-", "_"), ("/", ""), (":", ""), (".", "")]
     suffix_part = _gen_truncated_string_from_suffixes(
         dependent_scope_strings, 50, sepstring="_", part_replacements=replacements
     )
-    scope_suffix = "pseudo_trigger" + suffix_part
+    scope_suffix = "braid_triggers" + suffix_part
     return scope_suffix
 
 

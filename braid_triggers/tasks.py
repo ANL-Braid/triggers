@@ -7,10 +7,10 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Union
 
 from fastapi import HTTPException
 
-from pseudo_trigger.aiohttp_session import aio_session
-from pseudo_trigger.auth_utils import get_refreshed_access_token_for_scope
-from pseudo_trigger.expressions import eval_expressions
-from pseudo_trigger.models import (
+from braid_triggers.aiohttp_session import aio_session
+from braid_triggers.auth_utils import get_refreshed_access_token_for_scope
+from braid_triggers.expressions import eval_expressions
+from braid_triggers.models import (
     ActionStatus,
     ActionStatusValue,
     Event,
@@ -18,7 +18,7 @@ from pseudo_trigger.models import (
     ResponseTrigger,
     TriggerState,
 )
-from pseudo_trigger.persistence import remove_trigger, update_trigger
+from braid_triggers.persistence import remove_trigger, update_trigger
 
 log = logging.getLogger(__name__)
 

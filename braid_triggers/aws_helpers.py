@@ -1,6 +1,6 @@
 import boto3
 
-from pseudo_trigger.config import get_config_val
+from braid_triggers.config import get_config_val
 
 
 def create_aws_resource(resource: str, **kwargs):

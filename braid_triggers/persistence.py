@@ -10,9 +10,9 @@ from mypy_boto3_dynamodb import DynamoDBServiceResource
 from mypy_boto3_dynamodb.service_resource import Table as DynamoTable
 from pydantic import BaseModel
 
-from pseudo_trigger.aws_ops import boto3_resource
-from pseudo_trigger.models import InternalTrigger
-from pseudo_trigger.settings import get_settings
+from braid_triggers.aws_ops import boto3_resource
+from braid_triggers.models import InternalTrigger
+from braid_triggers.settings import get_settings
 
 _triggers: dict[str, InternalTrigger] = {}
 log = logging.getLogger(__name__)

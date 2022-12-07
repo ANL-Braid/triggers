@@ -1,15 +1,15 @@
 [tool.poetry]
-name = "pseudo_trigger"
+name = "braid_triggers"
 version = "0.1.0"
 description = "Experiments with a trigger service"
 authors = ["Jim Pruyne <pruyne@globus.org>"]
 
 packages = [
-{include="pseudo_trigger"}
+{include="braid_triggers"}
 ]
 
 [tool.poetry.scripts]
-pseudo-trigger = "pseudo_trigger.cli:main"
+pseudo-trigger = "braid_triggers.cli:main"
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -52,7 +52,7 @@ build-backend = "poetry.masonry.api"
 
 [tool.isort]
 profile = "black"
-src_paths = ["pseudo_trigger"]
+src_paths = ["braid_triggers"]
 multi_line_output = 3
 
 [tool.mypy]

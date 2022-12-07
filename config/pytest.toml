@@ -3,7 +3,7 @@ region="us-east-1"
 
 [aws.dynamodb]
 create_table=true
-table_name="pseudo_trigger_triggers"
+table_name="braid_triggers_triggers"
 BillingMode="PAY_PER_REQUEST"
 
 

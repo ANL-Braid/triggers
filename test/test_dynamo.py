@@ -1,8 +1,8 @@
 import os
 import uuid
 
-from pseudo_trigger.models import InternalTrigger, Token, TokenSet, TriggerState
-from pseudo_trigger.persistence import (
+from braid_triggers.models import InternalTrigger, Token, TokenSet, TriggerState
+from braid_triggers.persistence import (
     init_persistence,
     lookup_trigger,
     scan_triggers,

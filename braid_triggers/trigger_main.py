@@ -1,9 +1,9 @@
 import uvicorn
 
-from pseudo_trigger.models import TriggerState
-from pseudo_trigger.persistence import enum_triggers, init_persistence
-from pseudo_trigger.tasks import init_polling, set_trigger_state, start_poller
-from pseudo_trigger.trigger_views import app as trigger_app
+from braid_triggers.models import TriggerState
+from braid_triggers.persistence import enum_triggers, init_persistence
+from braid_triggers.tasks import init_polling, set_trigger_state, start_poller
+from braid_triggers.trigger_views import app as trigger_app
 
 from .logs import init_logging
 from .settings import get_settings

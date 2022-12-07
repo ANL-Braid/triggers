@@ -7,22 +7,22 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.exceptions import HTTPException
 from structlog.contextvars import bind_contextvars
 
-from pseudo_trigger.aiohttp_session import aio_session
-from pseudo_trigger.auth_utils import AuthInfo
-from pseudo_trigger.models import (
+from braid_triggers.aiohttp_session import aio_session
+from braid_triggers.auth_utils import AuthInfo
+from braid_triggers.models import (
     InternalTrigger,
     ResponseTrigger,
     Trigger,
     TriggerState,
 )
-from pseudo_trigger.persistence import (
+from braid_triggers.persistence import (
     lookup_trigger,
     remove_trigger,
     scan_triggers,
     store_trigger,
     update_trigger,
 )
-from pseudo_trigger.tasks import QUEUES_RECEIVE_SCOPE, set_trigger_state, start_poller
+from braid_triggers.tasks import QUEUES_RECEIVE_SCOPE, set_trigger_state, start_poller
 
 log = structlog.get_logger(__name__)
 

@@ -76,7 +76,7 @@ def init_logging(
                 "level": log_level.upper() if log_level else "INFO",
                 "propagate": False,
             },
-            "pseudo_trigger": {
+            "braid_triggers": {
                 "handlers": ["default"],
                 "level": log_level.upper() if log_level else "INFO",
                 "propagate": False,
