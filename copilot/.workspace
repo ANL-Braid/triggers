@@ -1,1 +1,2 @@
-application: triggers
+application: braid-services
+path: ""

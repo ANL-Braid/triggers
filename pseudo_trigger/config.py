@@ -53,6 +53,7 @@ def _load_config() -> Dict[str, Any]:
         config_file_path = _CONFIG_ROOT / config_file.format(env)
         try:
             config_info = toml.load(str(config_file_path))
+            breakpoint()
             print(f"LOADED Config from {config_file_path}")
             _deep_update(_config, config_info)
         except Exception as e:

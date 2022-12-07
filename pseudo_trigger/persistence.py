@@ -1,54 +1,44 @@
-import json
 import logging
 import numbers
-import os
+import typing as t
 import uuid
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Type,
-    TypeVar,
-    Union,
-)
 
 from boto3.dynamodb.conditions import Attr, Key
-from boto3.dynamodb.table import TableResource as DynamoTable
 from boto3.dynamodb.types import Binary, Decimal
 from botocore.exceptions import ClientError, EndpointConnectionError
+from mypy_boto3_dynamodb import DynamoDBServiceResource
+from mypy_boto3_dynamodb.service_resource import Table as DynamoTable
 from pydantic import BaseModel
 
-from pseudo_trigger.aws_helpers import create_aws_resource
-from pseudo_trigger.config import get_config_val
-from pseudo_trigger.log import setup_python_logging
+from pseudo_trigger.aws_ops import boto3_resource
 from pseudo_trigger.models import InternalTrigger
+from pseudo_trigger.settings import get_settings
 
-_triggers: Dict[str, InternalTrigger] = {}
+_triggers: dict[str, InternalTrigger] = {}
 log = logging.getLogger(__name__)
-setup_python_logging(log)
 
 _TRIGGER_KEY_SCHEMA = ({"AttributeName": "trigger_id", "KeyType": "HASH"},)
 _TRIGGER_ATTRIBUTE_DEFINITIONS = (
     {"AttributeName": "trigger_id", "AttributeType": "S"},
 )
 
+settings = get_settings()
+
 
 def create_table(
     table_name: str,
-    key_schema: Iterable[Mapping[str, str]],
-    attribute_definitions: Iterable[Mapping[str, str]],
+    key_schema: t.Iterable[t.Mapping[str, str]],
+    attribute_definitions: t.Iterable[t.Mapping[str, str]],
+    billing_mode="PAY_PER_REQUEST",
     **kwargs,
 ) -> DynamoTable:
     try:
-        client = create_aws_resource("dynamodb")
+        client = boto3_resource("dynamodb", DynamoDBServiceResource)
         client.create_table(
             TableName=table_name,
             AttributeDefinitions=attribute_definitions,
             KeySchema=key_schema,
+            BillingMode=billing_mode,
             **kwargs,
         )
     except ClientError as ce:
@@ -71,17 +61,18 @@ def create_table(
 def get_table(
     table_name: str,
 ) -> DynamoTable:
-    client = create_aws_resource("dynamodb")
+    client = boto3_resource("dynamodb", DynamoDBServiceResource)
+
     table: DynamoTable = client.Table(table_name)
     return table
 
 
-T = TypeVar("T")
+T = t.TypeVar("T")
 
 
 def _iterate_dict(
-    val: Optional[Any], val_transformer: Callable[[Any], Any]
-) -> Optional[Any]:
+    val: t.Any | None, val_transformer: t.Callable[[t.Any], t.Any]
+) -> t.Any | None:
     """Iterate over a nested (dict/list) structure, and call the transformer on any simple
     (non-dict/list) values
 
@@ -95,8 +86,8 @@ def _iterate_dict(
     return val
 
 
-def _from_dynamo_dict(d: Dict[str, Any]) -> Dict[str, Any]:
-    def dynamo_deserialize(val: Any) -> Any:
+def _from_dynamo_dict(d: dict[str, t.Any]) -> dict[str, t.Any]:
+    def dynamo_deserialize(val: t.Any) -> t.Any:
         if isinstance(val, Decimal):
             val = float(val)
             if int(val) == val:
@@ -108,8 +99,8 @@ def _from_dynamo_dict(d: Dict[str, Any]) -> Dict[str, Any]:
     return _iterate_dict(d, dynamo_deserialize)
 
 
-def _dict_to_dynamo_dict(d: Dict[str, Any]) -> Dict[str, Any]:
-    def dynamo_serialize(val: Any) -> Any:
+def _dict_to_dynamo_dict(d: dict[str, t.Any]) -> dict[str, t.Any]:
+    def dynamo_serialize(val: t.Any) -> t.Any:
         if isinstance(val, numbers.Number):
             val = Decimal(val)
         elif isinstance(val, (bytes, bytearray)):
@@ -121,16 +112,16 @@ def _dict_to_dynamo_dict(d: Dict[str, Any]) -> Dict[str, Any]:
     return _iterate_dict(d, dynamo_serialize)
 
 
-def _pydantic_model_to_dynamo_dict(model: BaseModel) -> Dict[str, Any]:
+def _pydantic_model_to_dynamo_dict(model: BaseModel) -> dict[str, t.Any]:
     return _dict_to_dynamo_dict(model.dict())
 
 
-def lookup_by_key(inst_class: Type[T], table: DynamoTable, **kwargs) -> Optional[T]:
+def lookup_by_key(inst_class: t.Type[T], table: DynamoTable, **kwargs) -> T | None:
     k, v = next(iter(kwargs.items()))
     response = table.query(KeyConditionExpression=Key(k).eq(v))
     items = response.get("Items")
 
-    instance: Optional[T] = None
+    instance: T | None = None
     if len(items) > 0:
         try:
             item = _from_dynamo_dict(items[0])
@@ -141,16 +132,16 @@ def lookup_by_key(inst_class: Type[T], table: DynamoTable, **kwargs) -> Optional
     return instance
 
 
-QueryElement = Union[BaseModel, Dict]
+QueryElement = t.Union[BaseModel, dict]
 
 
 def query_for_class(
-    inst_class: Type[T],
+    inst_class: t.Type[T],
     table: DynamoTable,
     *,
-    query_vals: Optional[Union[QueryElement, Iterable[QueryElement]]] = None,
+    query_vals: QueryElement | t.Iterable[QueryElement] | None = None,
     **kwargs,
-) -> List[T]:
+) -> list[T]:
     """Perform a scan of a dynamo table returning instances of the provided class. That
     class must take as constructor params the properties of the items returned from the
     scan.
@@ -202,32 +193,32 @@ def query_for_class(
 
     response = table.scan(FilterExpression=filter_expression)
     items = response.get("Items", [])
-    instances: List[T] = []
+    instances: list[T] = []
     for item in items:
         instances.append(inst_class(**item))
     return instances
 
 
-def lookup_trigger(trigger_id: str) -> Optional[InternalTrigger]:
+def lookup_trigger(trigger_id: str) -> InternalTrigger | None:
     table = get_table(
-        get_config_val("aws.dynamodb.table_name"),
+        settings.dynamo_table_name,
     )
     trigger = lookup_by_key(InternalTrigger, table, trigger_id=trigger_id)
     return trigger
 
 
 def scan_triggers(
-    query_vals: Optional[Union[QueryElement, Iterable[QueryElement]]] = None, **kwargs
-) -> List[InternalTrigger]:
+    query_vals: QueryElement | t.Iterable[QueryElement] | None = None, **kwargs
+) -> list[InternalTrigger]:
     table = get_table(
-        get_config_val("aws.dynamodb.table_name"),
+        settings.dynamo_table_name,
     )
     return query_for_class(InternalTrigger, table, query_vals=query_vals, **kwargs)
 
 
 def store_trigger(trigger: InternalTrigger) -> InternalTrigger:
     table = get_table(
-        get_config_val("aws.dynamodb.table_name"),
+        settings.dynamo_table_name,
     )
     if trigger.trigger_id is None:
         trigger.trigger_id = str(uuid.uuid4())
@@ -238,7 +229,7 @@ def store_trigger(trigger: InternalTrigger) -> InternalTrigger:
 
 def update_trigger(trigger: InternalTrigger) -> InternalTrigger:
     table = get_table(
-        get_config_val("aws.dynamodb.table_name"),
+        settings.dynamo_table_name,
     )
     if trigger.trigger_id is None:
         trigger.trigger_id = str(uuid.uuid4())
@@ -249,7 +240,7 @@ def update_trigger(trigger: InternalTrigger) -> InternalTrigger:
 
 def remove_trigger(trigger_id: str) -> InternalTrigger:
     table = get_table(
-        get_config_val("aws.dynamodb.table_name"),
+        settings.dynamo_table_name,
     )
     del_resp = table.delete_item(
         Key={
@@ -262,12 +253,12 @@ def remove_trigger(trigger_id: str) -> InternalTrigger:
     return InternalTrigger(**item)
 
 
-def enum_triggers(**kwargs) -> List[InternalTrigger]:
+def enum_triggers(**kwargs) -> list[InternalTrigger]:
     """
     This is probably really inefficient
     """
     table = get_table(
-        get_config_val("aws.dynamodb.table_name"),
+        settings.dynamo_table_name,
     )
     filter_expression = None
     for attr_name, val in kwargs.items():
@@ -276,35 +267,20 @@ def enum_triggers(**kwargs) -> List[InternalTrigger]:
             filter_expression = this_filter_expression
         else:
             filter_expression = filter_expression & this_filter_expression
-    response = table.scan(FilterExpression=filter_expression)
-    items = response.get("Items", [])
-    ret_items = [InternalTrigger(**_from_dynamo_dict(i)) for i in items]
+    try:
+        response = table.scan(FilterExpression=filter_expression)
+        items = response.get("Items", [])
+        ret_items = [InternalTrigger(**_from_dynamo_dict(i)) for i in items]
+    except Exception as e:
+        log.warning(f"Scan on filter {filter_expression} returned error {e}, {type(e)}")
+        ret_items = []
     return ret_items
 
 
 def init_persistence() -> None:
-    local_dynamo_config = {}
-    dynamo_config = get_config_val("aws.dynamodb")
-    local_dynamo_config.update(dynamo_config)
-    do_create = local_dynamo_config.pop("create_table", False)
-
-    # Hack(?) since this has a sub-key
-    _ = local_dynamo_config.pop("client_params", None)
-
-    if do_create:
-        table_name = local_dynamo_config.pop("table_name", None)
-        # As set by copilot
-        table_name = os.environ.get("TRIGGERTRIGGERS_NAME", table_name)
-        # As set by (current) Cloudformation
-        table_name = os.environ.get("TRIGGERS_TABLE_NAME", table_name)
-
-        if table_name is None:
-            print("CANNOT CREATE DYNAMO TABLE, NO table_name configured")
-        else:
-            create_table(
-                table_name=table_name,
-                key_schema=_TRIGGER_KEY_SCHEMA,
-                attribute_definitions=_TRIGGER_ATTRIBUTE_DEFINITIONS,
-                **local_dynamo_config,
-            )
-    return
+    if settings.create_dynamo_table:
+        create_table(
+            table_name=settings.dynamo_table_name,
+            key_schema=_TRIGGER_KEY_SCHEMA,
+            attribute_definitions=_TRIGGER_ATTRIBUTE_DEFINITIONS,
+        )

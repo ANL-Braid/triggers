@@ -5,12 +5,19 @@ from pseudo_trigger.persistence import enum_triggers, init_persistence
 from pseudo_trigger.tasks import init_polling, set_trigger_state, start_poller
 from pseudo_trigger.trigger_views import app as trigger_app
 
+from .logs import init_logging
+from .settings import get_settings
+
 
 @trigger_app.on_event("startup")
 async def startup():
     print("#####################")
     print("# PSEUDO TRIGGER STARTING UP....")
     print("#####################")
+
+    settings = get_settings()
+    init_logging(log_level=settings.log_level, log_format=settings.log_format)
+
     init_persistence()
 
     await init_polling()

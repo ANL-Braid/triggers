@@ -1,4 +1,7 @@
-FROM python:3.8-slim-buster
+FROM python:3.10-slim-buster
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=on
+ENV PYTHONBREAKPOINT=0
 
 RUN mkdir /pseudo-trigger
 
@@ -6,11 +9,14 @@ WORKDIR /pseudo-trigger
 
 COPY ./ ./
 
-RUN apt-get update -y
+RUN python3 -m pip install poetry
 
 RUN pip install poetry==1.1
 
-RUN poetry install --no-dev
+RUN \
+    set -eu; \
+    poetry install --only main; \
+    poetry cache clear --all --no-interaction pypi;
 
 EXPOSE 5001
 

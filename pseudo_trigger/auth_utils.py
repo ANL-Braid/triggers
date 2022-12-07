@@ -1,18 +1,8 @@
+import copy
 import logging
 import time
+import typing as t
 from base64 import b64encode
-from typing import (
-    Any,
-    Dict,
-    FrozenSet,
-    Iterable,
-    List,
-    Mapping,
-    MutableSequence,
-    Optional,
-    Set,
-    Tuple,
-)
 
 import cachetools
 from fastapi import HTTPException
@@ -21,29 +11,36 @@ from pseudo_trigger.aiohttp_session import aio_session
 from pseudo_trigger.config import get_config_val
 from pseudo_trigger.models import InternalTrigger, Token, TokenSet
 
+from .settings import get_settings
+
 AUTH_DOMAIN = "https://auth.globus.org/"
 
 log = logging.getLogger(__name__)
 
 
+# If we cannot introspect a token (e.g. there is no token) this is the empty token
+# response we assume
+_empty_token_resp = {"sub": None}
+
+
 class AuthInfo(object):
     def __init__(self, bearer_token: str):
         self.access_token = bearer_token
-        self._usertoken: Optional[Token] = None
-        self._token_resp: Dict = {}
-        self._dependent_tokens: Optional[List[Token]] = None
-        self._tokenset: Optional[TokenSet] = None
+        self._usertoken: Token | None = None
+        self._token_resp: dict[str, t.Any] | None = None
+        self._dependent_tokens: list[Token] | None = None
+        self._tokenset: TokenSet | None = None
 
     @property
-    async def token_resp(self) -> Dict:
-        if not self._token_resp:
+    async def token_resp(self) -> dict[str, t.Any]:
+        if self._token_resp is None:
             if self.access_token:
                 token_resp = await introspect_token(self.access_token)
-                print(f"DEBUG  (token_resp):= {(token_resp)}")
-
-                self._token_resp = token_resp
-                for k, v in self._token_resp.items():
-                    setattr(self, k, v)
+            else:
+                token_resp = copy.deepcopy(_empty_token_resp)
+            self._token_resp = token_resp
+            for k, v in self._token_resp.items():
+                setattr(self, k, v)
 
         return self._token_resp
 
@@ -62,7 +59,7 @@ class AuthInfo(object):
         return self._usertoken
 
     @property
-    async def dependent_tokens(self) -> List[Token]:
+    async def dependent_tokens(self) -> list[Token]:
         if self._dependent_tokens is None:
             dep_tokens = await dependent_token_exchange(self.access_token)
             self._dependent_tokens = []
@@ -74,8 +71,8 @@ class AuthInfo(object):
         return self._dependent_tokens
 
     @property
-    async def dependent_tokens_by_scope(self) -> Dict[str, Token]:
-        return {t.scope: t for t in await self.dependent_tokens}
+    async def dependent_tokens_by_scope(self) -> dict[str, Token]:
+        return {dep_tkn.scope: dep_tkn for dep_tkn in await self.dependent_tokens}
 
     @property
     async def token_set(self) -> TokenSet:
@@ -88,7 +85,7 @@ class AuthInfo(object):
         return self._tokenset
 
     async def authorize(
-        self, required_scope: str, required_principals: Set[str]
+        self, required_scope: str, required_principals: set[str]
     ) -> None:
         if "public" in required_principals:
             return
@@ -100,12 +97,12 @@ class AuthInfo(object):
 
 
 def _client_auth_header(
-    client_id: Optional[str] = None, client_secret: Optional[str] = None
-) -> Dict[str, str]:
+    client_id: str | None = None, client_secret: str | None = None
+) -> dict[str, str]:
     if client_id is None:
-        client_id = get_config_val("globus.auth.CLIENT_ID", None)
+        client_id = get_settings().globus_auth_client_id
     if client_secret is None:
-        client_secret = get_config_val("globus.auth.CLIENT_SECRET", None)
+        client_secret = get_settings().globus_auth_client_secret
     auth_string = f"{client_id}:{client_secret}"
     return {
         "Authorization": "Basic "
@@ -116,7 +113,7 @@ def _client_auth_header(
 async def _perform_auth_request(
     path: str,
     method: str,
-    body: Optional[Mapping] = None,
+    body: t.Mapping | None = None,
     path_type: str = "api",
     body_type="json",
 ):
@@ -155,7 +152,9 @@ async def _perform_auth_request(
     return response_json
 
 
-async def introspect_token(token: str, client_id: Optional[str] = None) -> Dict:
+async def introspect_token(
+    token: str, client_id: str | None = None
+) -> dict[str, t.Any]:
     params = {"token": token, "include": "identities_set"}
     # Same algorithm as in dependent_token_exchange() to try with flow-specific client id
     # and the Flows service client_id
@@ -177,7 +176,7 @@ async def introspect_token(token: str, client_id: Optional[str] = None) -> Dict:
 
 async def dependent_token_exchange(
     token: str, offline_access: bool = True
-) -> List[Dict]:
+) -> list[dict[str, t.Any]]:
     params = {
         "grant_type": "urn:globus:auth:grant_type:dependent_token",
         "token": token,
@@ -191,7 +190,7 @@ async def dependent_token_exchange(
 
 async def get_refreshed_access_token_for_scope(
     trigger: InternalTrigger, scope: str
-) -> Optional[str]:
+) -> str | None:
     token = trigger.token_set.dependent_tokens.get(scope)
     if token is None:
         log.warn(f"No token for scope {scope}")
@@ -215,7 +214,7 @@ async def get_refreshed_access_token_for_scope(
     return token.access_token
 
 
-async def refresh_token_grant(refresh_token: str) -> Dict:
+async def refresh_token_grant(refresh_token: str) -> dict[str, t.Any]:
     url = "/token"
     params = {"grant_type": "refresh_token", "refresh_token": refresh_token}
     refresh_resp = await _perform_auth_request(
@@ -224,7 +223,7 @@ async def refresh_token_grant(refresh_token: str) -> Dict:
     return refresh_resp
 
 
-_my_scope_cache: Optional[Dict[FrozenSet, str]] = None
+_my_scope_cache: dict[t.FrozenSet, str] | None = None
 
 
 async def initialize_scope_cache():
@@ -244,10 +243,10 @@ async def my_scopes():
 
 
 def _gen_truncated_string_from_suffixes(
-    strings: List[str],
+    strings: list[str],
     max_len: int,
     sepstring: str = "_",
-    part_replacements: Iterable[Tuple[str, str]] = (),
+    part_replacements: t.Iterable[t.Tuple[str, str]] = (),
 ) -> str:
     ret_string = ""
     if len(strings) > 0:
@@ -261,7 +260,7 @@ def _gen_truncated_string_from_suffixes(
     return ret_string
 
 
-def _gen_scope_name(dependent_scope_strings: List[str]) -> str:
+def _gen_scope_name(dependent_scope_strings: list[str]) -> str:
     scope_name = "Pseudo Trigger using scopes"
     suffix_part = _gen_truncated_string_from_suffixes(
         dependent_scope_strings, 180, sepstring=","
@@ -269,7 +268,7 @@ def _gen_scope_name(dependent_scope_strings: List[str]) -> str:
     return scope_name + suffix_part
 
 
-def _gen_scope_suffix(dependent_scope_strings: List[str]) -> str:
+def _gen_scope_suffix(dependent_scope_strings: list[str]) -> str:
     """
     Really, any unique string is ok here
     """
@@ -283,9 +282,9 @@ def _gen_scope_suffix(dependent_scope_strings: List[str]) -> str:
 
 
 async def get_scope_for_dependent_set(
-    dependent_scope_strings: List[str],
-    scope_name: Optional[str] = None,
-    scope_suffix: Optional[str] = None,
+    dependent_scope_strings: list[str],
+    scope_name: str | None = None,
+    scope_suffix: str | None = None,
 ) -> str:
     await initialize_scope_cache()
     scope_ids = await lookup_scope_ids(dependent_scope_strings)
@@ -312,7 +311,9 @@ async def get_scope_for_dependent_set(
     return scope_string
 
 
-def _dependent_scope_param(dependent_scope_ids: Iterable[str]) -> List[Dict[str, Any]]:
+def _dependent_scope_param(
+    dependent_scope_ids: t.Iterable[str],
+) -> list[dict[str, t.Any]]:
     return [
         {"scope": sid, "optional": False, "requires_refresh_token": True}
         for sid in dependent_scope_ids
@@ -320,7 +321,7 @@ def _dependent_scope_param(dependent_scope_ids: Iterable[str]) -> List[Dict[str,
 
 
 async def create_scope(
-    scope_name: str, scope_suffix: str, dependent_scope_ids: Iterable[str]
+    scope_name: str, scope_suffix: str, dependent_scope_ids: t.Iterable[str]
 ) -> str:
     params = {
         "scope": {
@@ -348,11 +349,11 @@ async def create_scope(
 _scope_id_cache = cachetools.TTLCache(maxsize=100, ttl=12 * 60 * 60)
 
 
-async def lookup_scope_ids(scope_strings: MutableSequence[str]) -> Dict[str, str]:
+async def lookup_scope_ids(scope_strings: t.MutableSequence[str]) -> dict[str, str]:
     """Do an Auth request to lookup a set of scope strings and return back a Dict mapping
     the input scope strings to their ids.
     """
-    return_dict: Dict[str, str] = {}
+    return_dict: dict[str, str] = {}
     unknown_scopes = []
     # Check for presence of the desired scope string in the cache and that it has been
     # updated within the last 12 hours. 12 hour policy is pretty much arbitrary.

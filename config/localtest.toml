@@ -1,0 +1,2 @@
+create_dynamo_table = true
+dynamo_table_name = "trigger_table_testing"

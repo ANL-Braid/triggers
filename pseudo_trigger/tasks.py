@@ -10,7 +10,6 @@ from fastapi import HTTPException
 from pseudo_trigger.aiohttp_session import aio_session
 from pseudo_trigger.auth_utils import get_refreshed_access_token_for_scope
 from pseudo_trigger.expressions import eval_expressions
-from pseudo_trigger.log import setup_python_logging
 from pseudo_trigger.models import (
     ActionStatus,
     ActionStatusValue,
@@ -22,7 +21,6 @@ from pseudo_trigger.models import (
 from pseudo_trigger.persistence import remove_trigger, update_trigger
 
 log = logging.getLogger(__name__)
-setup_python_logging(log)
 
 QUEUES_RECEIVE_SCOPE = (
     "https://auth.globus.org/scopes/3170bf0b-6789-4285-9aba-8b7875be7cbc/receive"

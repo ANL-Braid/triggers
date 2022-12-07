@@ -1,12 +1,14 @@
-import logging
+import time
+import typing as t
 import uuid
-from typing import Any, List, Mapping, Optional, Union
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+import structlog
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi.exceptions import HTTPException
+from structlog.contextvars import bind_contextvars
 
 from pseudo_trigger.aiohttp_session import aio_session
-from pseudo_trigger.auth_utils import AuthInfo, get_scope_for_dependent_set
-from pseudo_trigger.log import setup_python_logging
+from pseudo_trigger.auth_utils import AuthInfo
 from pseudo_trigger.models import (
     InternalTrigger,
     ResponseTrigger,
@@ -22,19 +24,23 @@ from pseudo_trigger.persistence import (
 )
 from pseudo_trigger.tasks import QUEUES_RECEIVE_SCOPE, set_trigger_state, start_poller
 
-log = logging.getLogger(__name__)
-setup_python_logging(log, http=True)
+log = structlog.get_logger(__name__)
 
-
-MANAGE_TRIGGERS_SCOPE = "https://auth.globus.org/scopes/5292be17-96f0-4ab6-957a-ecd516a1759e/manage_triggers"
-ENABLE_TRIGGER_WITH_QUEUE_READ_SCOPE = "https://auth.globus.org/scopes/5292be17-96f0-4ab6-957a-ecd516a1759e/trigger_enable_with_queue_read"
+MANAGE_TRIGGERS_SCOPE = (
+    "https://auth.globus.org/scopes/9b54c03e-30be-43e7-8b5d-133f94930837"
+    "/manage_triggers"
+)
+ENABLE_TRIGGER_WITH_QUEUE_READ_SCOPE = (
+    "https://auth.globus.org/scopes/9b54c03e-30be-43e7-8b5d-133f94930837/"
+    "trigger_enable_with_queue_read"
+)
 
 
 app = FastAPI()
 
 
 async def globus_auth_dependency(
-    authorization: Optional[str] = Header(None),
+    authorization: str | None = Header(None),
 ) -> AuthInfo:
     token = ""
     if authorization is not None:
@@ -43,7 +49,40 @@ async def globus_auth_dependency(
             token = authorization.lstrip("Bearer ")
 
     auth_info = AuthInfo(token)
+    # Make sure the token has been introspected
+    _ = await auth_info.token_resp
     return auth_info
+
+
+async def globus_auth_required_dependency(
+    request: Request,
+    auth_info: AuthInfo = Depends(globus_auth_dependency),
+) -> AuthInfo:
+    if auth_info.sub is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Authorization information required to use method {request.url}",
+        )
+    return auth_info
+
+
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next) -> Response:
+    req_id = str(uuid.uuid4())
+    start_time = time.time()
+    bind_contextvars(req_id=req_id)
+    response = await call_next(request)
+    end_time = time.time()
+    run_time = end_time - start_time
+    log.info(
+        f"{request.method} {request.url.path} {request.query_params}",
+        path=request.url.path,
+        method=request.method,
+        params=request.query_params,
+        status_code=response.status_code,
+        run_time_ms=round(run_time * 1000),
+    )
+    return response
 
 
 @app.get("/status")
@@ -54,7 +93,7 @@ async def healthcheck():
 
 @app.post("/triggers", response_model=ResponseTrigger)
 async def create_trigger(
-    trigger: Trigger, auth_info: AuthInfo = Depends(globus_auth_dependency)
+    trigger: Trigger, auth_info: AuthInfo = Depends(globus_auth_required_dependency)
 ):
     await auth_info.authorize(MANAGE_TRIGGERS_SCOPE, {"all_authenticated_users"})
     if trigger.action_scope is None:
@@ -71,7 +110,10 @@ async def create_trigger(
     if trigger.action_scope is None:
         raise HTTPException(
             status_code=400,
-            detail=f"'auth_scope' not provided and unable to retrieve from {str(trigger.action_url)}",
+            detail=(
+                "'auth_scope' not provided and unable to retrieve from "
+                f"{str(trigger.action_url)}"
+            ),
         )
 
     """
@@ -101,7 +143,7 @@ async def create_trigger(
 
 
 async def _lookup_trigger(
-    trigger_id: str, auth_info: Optional[AuthInfo] = None
+    trigger_id: str, auth_info: AuthInfo | None = None
 ) -> InternalTrigger:
     trigger = lookup_trigger(trigger_id)
     # log.info(f"lookup({trigger_id}): {trigger}")
@@ -116,26 +158,22 @@ async def _lookup_trigger(
 
 @app.get("/triggers/{trigger_id}", response_model=ResponseTrigger)
 async def get_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_required_dependency)
 ) -> InternalTrigger:
     return await _lookup_trigger(trigger_id)
 
 
-@app.get("/triggers", response_model=List[ResponseTrigger])
+@app.get("/triggers", response_model=list[ResponseTrigger])
 async def list_triggers(
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
-) -> List[InternalTrigger]:
-    # Make sure the token's been introspected
-    _ = await auth_info.token_resp
+    auth_info: AuthInfo = Depends(globus_auth_required_dependency),
+) -> list[InternalTrigger]:
     triggers = scan_triggers(created_by=auth_info.sub)
     return triggers
 
 
 @app.post("/triggers/{trigger_id}/enable", response_model=ResponseTrigger)
 async def enable_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_required_dependency)
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
 
@@ -151,8 +189,7 @@ async def enable_trigger(
 
 @app.post("/triggers/{trigger_id}/disable", response_model=ResponseTrigger)
 async def disable_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_required_dependency)
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
     set_trigger_state(trigger_id, TriggerState.PENDING)
@@ -160,7 +197,7 @@ async def disable_trigger(
 
 
 @app.post("/triggers/{trigger_id}/event")
-async def send_event(trigger_id: str, body: Union[str, Mapping[str, Any]]) -> None:
+async def send_event(trigger_id: str, body: str | t.Mapping[str, t.Any]) -> dict:
     trigger = await _lookup_trigger(trigger_id)
     if trigger.state is not TriggerState.ENABLED:
         raise HTTPException(
@@ -172,8 +209,7 @@ async def send_event(trigger_id: str, body: Union[str, Mapping[str, Any]]) -> No
 
 @app.delete("/triggers/{trigger_id}", response_model=ResponseTrigger)
 async def delete_trigger(
-    trigger_id: str,
-    auth_info: AuthInfo = Depends(globus_auth_dependency),
+    trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_required_dependency)
 ) -> InternalTrigger:
     trigger = await _lookup_trigger(trigger_id, auth_info)
     prev_state = set_trigger_state(trigger_id, TriggerState.DELETING)

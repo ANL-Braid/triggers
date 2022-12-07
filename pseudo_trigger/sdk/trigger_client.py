@@ -14,7 +14,10 @@ from .auth import get_authorizer_for_scope
 
 _DEFAULT_BASE_URL = "https://triggers-api.test.triggers.automate.globuscs.info"
 BASE_URL = os.environ.get("PSEUDO_TRIGGER_URL", _DEFAULT_BASE_URL)
-MANAGE_TRIGGERS_SCOPE = "https://auth.globus.org/scopes/5292be17-96f0-4ab6-957a-ecd516a1759e/manage_triggers"
+MANAGE_TRIGGERS_SCOPE = (
+    "https://auth.globus.org/scopes/9b54c03e-30be-43e7-8b5d-133f94930837"
+    "/manage_triggers"
+)
 
 
 class TriggerClient(BaseClient):
