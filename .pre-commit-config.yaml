@@ -5,6 +5,9 @@ repos:
 #    -   id: check-yaml   This doesn't work with CFN
     -   id: end-of-file-fixer
     -   id: trailing-whitespace
+    -   id: check-ast
+    -   id: check-json
+    -   id: check-toml
 -   repo: https://github.com/psf/black
     rev: 22.10.0
     hooks:
@@ -14,3 +17,8 @@ repos:
   hooks:
     - id: isort
       name: isort (python)
+- repo: https://github.com/pycqa/flake8
+  rev: 6.0.0
+  hooks:
+    - id: flake8
+      name: flake8 (python)

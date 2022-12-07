@@ -23,7 +23,10 @@ _base_url_argument = typer.Argument(
     _DEFAULT_BASE_URL, envvar="BRAID_TRIGGERS_URL", hidden=True
 )
 CLI_NATIVE_CLIENT_ID = "1602fba0-9893-49cb-a2fe-aa064b452462"
-MANAGE_TRIGGERS_SCOPE = "https://auth.globus.org/scopes/5292be17-96f0-4ab6-957a-ecd516a1759e/manage_triggers"
+MANAGE_TRIGGERS_SCOPE = (
+    "https://auth.globus.org/scopes/"
+    "5292be17-96f0-4ab6-957a-ecd516a1759e/manage_triggers"
+)
 
 verbosity_option = typer.Option(
     False, "--verbose", "-v", help="Run with increased verbosity", show_default=False

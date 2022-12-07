@@ -237,7 +237,8 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                     msgs_json = await msgs_response.json()
                     msg_list = msgs_json.get("data", [])
                     log.debug(
-                        f"Poller trigger_id={trigger_id}, queue_id={queue_id} received {len(msg_list)} messages"
+                        f"Poller trigger_id={trigger_id}, queue_id={queue_id}"
+                        f"received {len(msg_list)} messages"
                     )
                     for msg in msg_list:
                         event = Event.from_queue_msg(msg)
@@ -258,7 +259,8 @@ async def poller(trigger: InternalTrigger) -> ResponseTrigger:
                 else:
                     text = await msgs_response.text()
                     log.debug(
-                        f"trigger_id={trigger_id} Got unexpected response from queue {queue_id}: "
+                        f"trigger_id={trigger_id} Got unexpected response from "
+                        f"queue {queue_id}: "
                         f"{msgs_response} containing {text}"
                     )
                     trigger.last_action_status = _error_action_status(
@@ -358,4 +360,4 @@ async def init_polling():
 
 async def shutdown_polling():
     reaper_state[0] = False
-    reaper_result = await asyncio.wait_for(reaper_state[1])
+    _ = await asyncio.wait_for(reaper_state[1])

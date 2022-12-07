@@ -4,7 +4,6 @@ import uuid
 
 import structlog
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
-from fastapi.exceptions import HTTPException
 from structlog.contextvars import bind_contextvars
 
 from braid_triggers.aiohttp_session import aio_session
