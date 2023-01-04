@@ -1,10 +1,20 @@
+import os
 import time
 import typing as t
 import uuid
 
 import structlog
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
-from structlog.contextvars import bind_contextvars
+from fastapi import (
+    APIRouter,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+)
+from fastapi.responses import JSONResponse
+from structlog.contextvars import bind_contextvars, get_contextvars
 
 from braid_triggers.aiohttp_session import aio_session
 from braid_triggers.auth_utils import AuthInfo
@@ -37,6 +47,11 @@ ENABLE_TRIGGER_WITH_QUEUE_READ_SCOPE = (
 
 app = FastAPI()
 
+service_name = os.getenv("COPILOT_SERVICE_NAME", "concurrent-actions-provider")
+
+route_prefix = f"/{service_name}"
+native_router = APIRouter(prefix=route_prefix)
+
 
 async def globus_auth_dependency(
     authorization: str | None = Header(None),
@@ -58,6 +73,7 @@ async def globus_auth_required_dependency(
     auth_info: AuthInfo = Depends(globus_auth_dependency),
 ) -> AuthInfo:
     if auth_info.sub is None:
+        log.info(f"Railed to get authorization info on path {request.url}")
         raise HTTPException(
             status_code=400,
             detail=f"Authorization information required to use method {request.url}",
@@ -84,13 +100,26 @@ async def logging_middleware(request: Request, call_next) -> Response:
     return response
 
 
-@app.get("/status")
+@app.exception_handler(Exception)
+async def app_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    log.exception(exc)
+    req_id = get_contextvars().get("req_id", "<unknown>")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "message": f"Internal Service Error Encountered: {str(exc)}",
+            "req_id": req_id,
+        },
+    )
+
+
+@native_router.get("/status")
 @app.get("/")
 async def healthcheck():
     return {"status": "ok"}
 
 
-@app.post("/triggers", response_model=ResponseTrigger)
+@native_router.post("/triggers", response_model=ResponseTrigger)
 async def create_trigger(
     trigger: Trigger, auth_info: AuthInfo = Depends(globus_auth_required_dependency)
 ):
@@ -155,14 +184,14 @@ async def _lookup_trigger(
     return trigger
 
 
-@app.get("/triggers/{trigger_id}", response_model=ResponseTrigger)
+@native_router.get("/triggers/{trigger_id}", response_model=ResponseTrigger)
 async def get_trigger(
     trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_required_dependency)
 ) -> InternalTrigger:
     return await _lookup_trigger(trigger_id)
 
 
-@app.get("/triggers", response_model=list[ResponseTrigger])
+@native_router.get("/triggers", response_model=list[ResponseTrigger])
 async def list_triggers(
     auth_info: AuthInfo = Depends(globus_auth_required_dependency),
 ) -> list[InternalTrigger]:
@@ -170,7 +199,7 @@ async def list_triggers(
     return triggers
 
 
-@app.post("/triggers/{trigger_id}/enable", response_model=ResponseTrigger)
+@native_router.post("/triggers/{trigger_id}/enable", response_model=ResponseTrigger)
 async def enable_trigger(
     trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_required_dependency)
 ) -> InternalTrigger:
@@ -186,7 +215,7 @@ async def enable_trigger(
     return trigger
 
 
-@app.post("/triggers/{trigger_id}/disable", response_model=ResponseTrigger)
+@native_router.post("/triggers/{trigger_id}/disable", response_model=ResponseTrigger)
 async def disable_trigger(
     trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_required_dependency)
 ) -> InternalTrigger:
@@ -195,7 +224,7 @@ async def disable_trigger(
     return trigger
 
 
-@app.post("/triggers/{trigger_id}/event")
+@native_router.post("/triggers/{trigger_id}/event")
 async def send_event(trigger_id: str, body: str | t.Mapping[str, t.Any]) -> dict:
     trigger = await _lookup_trigger(trigger_id)
     if trigger.state is not TriggerState.ENABLED:
@@ -206,7 +235,7 @@ async def send_event(trigger_id: str, body: str | t.Mapping[str, t.Any]) -> dict
     return {}
 
 
-@app.delete("/triggers/{trigger_id}", response_model=ResponseTrigger)
+@native_router.delete("/triggers/{trigger_id}", response_model=ResponseTrigger)
 async def delete_trigger(
     trigger_id: str, auth_info: AuthInfo = Depends(globus_auth_required_dependency)
 ) -> InternalTrigger:
@@ -216,3 +245,6 @@ async def delete_trigger(
     if prev_state is not TriggerState.ENABLED:
         remove_trigger(trigger_id)
     return trigger
+
+
+app.include_router(native_router)

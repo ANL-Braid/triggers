@@ -68,10 +68,6 @@ def test_store_trigger():
     back_trigger = lookup_trigger(trigger_id)
     assert back_trigger.trigger_id == trigger.trigger_id
 
-    import pdb
-
-    # pdb.set_trace()
-
     scanned_triggers = scan_triggers(
         created_by=[trigger.created_by, trigger2.created_by]
     )

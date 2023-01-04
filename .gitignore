@@ -113,6 +113,8 @@ test_result.xml
 
 # Protected config stuff
 config/*-local.toml
+private_vals.sh
+docker_local_secrets.env
 
 # Working stuff
 *.foo

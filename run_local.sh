@@ -2,6 +2,25 @@
 
 script_dir=$(dirname $0)
 
-GLOBUS_AUTH_CLIENT_ID="9b54c03e-30be-43e7-8b5d-133f94930837" \
-    GLOBUS_AUTH_CLIENT_SECRET="NDms9sZ5H5v5waFtkyKHPUUQkgrH1RsXpR1jg+3DxyU=" \
-    ${script_dir}/.venv/bin/uvicorn braid_triggers.trigger_main:app --host 0.0.0.0 --port 5001 --reload
+
+if [ -f docker_local.env ]; then
+    source docker_local.env
+fi
+
+export AWS_ENDPOINT_URL
+export AWS_DEFAULT_REGION
+export AWS_ACCESS_KEY_ID
+export AWS_SECRET_ACCESS_KEY
+export COPILOT_SERVICE_NAME
+export COPILOT_ENVIRONMENT_NAME
+
+
+if [ -f docker_local_secrets.env ]; then
+    source docker_local_secrets.env
+fi
+
+
+export GLOBUS_AUTH_CLIENT_ID
+export GLOBUS_AUTH_CLIENT_SECRET
+
+${script_dir}/.venv/bin/uvicorn braid_triggers.trigger_main:app --host 0.0.0.0 --port 5001 --reload

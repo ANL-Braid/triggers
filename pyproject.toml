@@ -45,6 +45,7 @@ python-lsp-black = "^1"
 pylsp-rope = "^0"
 httpx = "^0"
 ruff = "^0"
+typer = "^0.7.0"
 
 [build-system]
 requires = ["poetry_core>=1.0.0"]

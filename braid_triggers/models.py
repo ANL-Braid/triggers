@@ -3,10 +3,10 @@ from __future__ import annotations
 import datetime
 import json
 import time
+import typing as t
 import uuid
 from enum import Enum, unique
 from json import JSONDecodeError
-from typing import Any, Dict, List, Mapping, Optional
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -34,28 +34,28 @@ class ActionStatus(BaseModel):
     creator_id: str
     action_id: str
     start_time: datetime.datetime = Field(default_factory=datetime.datetime.now)
-    label: Optional[str] = None
-    monitor_by: Optional[List[str]] = None
-    manage_by: Optional[List[str]] = None
-    completion_time: Optional[str] = None
-    release_after: Optional[str] = None
-    display_status: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    label: str | None = None
+    monitor_by: list[str] | None = None
+    manage_by: list[str] | None = None
+    completion_time: str | None = None
+    release_after: str | None = None
+    display_status: str | None = None
+    details: dict[str, t.Any] | None = None
 
     def is_complete(self):
         return self.status in (ActionStatusValue.SUCCEEDED, ActionStatusValue.FAILED)
 
 
 class Event(BaseModel):
-    body: Dict[str, Any]
+    body: dict[str, t.Any]
     event_id: str
     sent_by_effective_identity: str
     timestamp: str
-    sent_by_app: Optional[str] = None
-    sent_by_identity_set: Optional[List[str]] = None
+    sent_by_app: str | None = None
+    sent_by_identity_set: list[str] | None = None
 
     @staticmethod
-    def from_queue_msg(queue_msg: Dict[str, Any]) -> "Event":
+    def from_queue_msg(queue_msg: dict[str, t.Any]) -> "Event":
         message_body = queue_msg.get("message_body", "")
         try:
             event_body = json.loads(message_body)
@@ -78,8 +78,8 @@ class Token(BaseModel):
     scope: str
     refresh_token: str
     expiration_time: int
-    resource_server: Optional[str] = None
-    token_type: Optional[str] = None
+    resource_server: str | None = None
+    token_type: str | None = None
 
     def requires_refresh(self) -> bool:
         now = time.time()
@@ -89,7 +89,7 @@ class Token(BaseModel):
 
 class TokenSet(BaseModel):
     user_token: Token
-    dependent_tokens: Mapping[str, Token]
+    dependent_tokens: t.Mapping[str, Token]
 
 
 @unique
@@ -107,9 +107,9 @@ class Trigger(BaseModel):
 
     queue_id: uuid.UUID
     action_url: HttpUrl
-    action_scope: Optional[HttpUrl]
+    action_scope: HttpUrl | None
     event_filter: str
-    event_template: Dict[str, Any]
+    event_template: dict[str, t.Any]
 
 
 class ResponseTrigger(Trigger):
@@ -117,13 +117,13 @@ class ResponseTrigger(Trigger):
     created_by: str
     globus_auth_scope: HttpUrl
     state: TriggerState
-    last_action_status: Optional[ActionStatus] = None
-    last_action_statuses: Optional[List[ActionStatus]] = None
-    last_error_action_status: Optional[ActionStatus] = None
+    last_action_status: ActionStatus | None = None
+    last_action_statuses: list[ActionStatus] | None = None
+    last_error_action_status: ActionStatus | None = None
     event_count: int = 0
-    last_event: Optional[Event] = None
+    last_event: Event | None = None
 
 
 class InternalTrigger(ResponseTrigger):
     token_set: TokenSet
-    all_action_status: List[ActionStatus]
+    all_action_status: list[ActionStatus]

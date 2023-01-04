@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from asyncio.queues import QueueEmpty
@@ -99,7 +101,7 @@ async def auth_header_for_scope(scope: str, trigger: InternalTrigger) -> Dict[st
 async def check_action_result(
     action_resp,
     trigger: InternalTrigger,
-    action_id: Optional[str] = _LOCAL_FAILURE_ACTION_ID,
+    action_id: str | None = _LOCAL_FAILURE_ACTION_ID,
 ) -> ActionStatus:
     log.info(f"Action Result for trigger_id={trigger.trigger_id}: {action_resp}")
     if 200 <= action_resp.status < 300:
@@ -108,21 +110,21 @@ async def check_action_result(
         if "creator_id" not in action_status_dict:
             action_status_dict["creator_id"] = trigger.created_by
         if action_status_dict.get("status") in {"SUCCEEDED", "FAILED"}:
-            # Not going to release for now so that we keep them around for stats counting
-            """
             action_id = action_status_dict.get("action_id")
-            auth_header = await auth_header_for_scope(trigger.action_scope, trigger)
+            auth_header = await auth_header_for_scope(
+                str(trigger.action_scope), trigger
+            )
             release_resp = await aio_session.post(
                 f"{trigger.action_url}/{action_id}/release", headers=auth_header
             )
             if 200 <= release_resp.status < 300:
                 action_status_dict = await release_resp.json()
-            """
         action_status = ActionStatus(**action_status_dict)
     else:
         action_status = _error_action_status(
             await action_resp.text(), action_id=action_id
         )
+    log.info(f"Returning status for trigger_id={trigger.trigger_id}: {action_status}")
     return action_status
 
 
