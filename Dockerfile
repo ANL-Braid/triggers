@@ -11,7 +11,7 @@ COPY ./ ./
 
 RUN python3 -m pip install poetry
 
-RUN pip install poetry==1.2
+RUN pip install poetry>=1.3
 
 RUN \
     set -eu; \
