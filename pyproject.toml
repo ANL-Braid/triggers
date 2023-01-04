@@ -27,7 +27,7 @@ colorama = "^0"
 starlette-context = "^0"
 toml = "^0"
 globus-action-provider-tools = "^0"
-fastapi = "^0"
+fastapi = "^0.88"
 structlog = "^22"
 
 [tool.poetry.group.dev.dependencies]
